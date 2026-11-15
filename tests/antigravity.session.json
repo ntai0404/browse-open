@@ -1,0 +1,13 @@
+{
+  "toolPermission": "request-review",
+  "permissions": {
+    "allow": [
+      "mcp(chromium_open/doctor)",
+      "mcp(chromium_open/profiles)",
+      "mcp(chromium_open/connect)",
+      "mcp(chromium_open/tabs)",
+      "mcp(chromium_open/open)",
+      "mcp(chromium_open/verify)"
+    ]
+  }
+}

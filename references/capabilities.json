@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "platforms": {
+    "win32": "IMPLEMENTED",
+    "darwin": "UNSUPPORTED",
+    "linux": "UNSUPPORTED"
+  },
+  "commands": {
+    "doctor": {
+      "preconditions": [
+        "Node >=22 with native WebSocket",
+        "Windows host process inspection permission"
+      ],
+      "expectedResult": "OS, binaries, instances, roots and supported transport inventory; no browser mutation",
+      "failures": [
+        "HOST_INSPECTION_FAILED",
+        "TIMEOUT"
+      ],
+      "verification": "CIM process metadata and netstat listeners; not a browser health claim",
+      "options": [
+        "timeout",
+        "user-data-dir",
+        "executable"
+      ]
+    },
+    "profiles": {
+      "preconditions": [
+        "Explicit existing user-data-dir"
+      ],
+      "expectedResult": "Numbered directory IDs and optional display names; no profile creation",
+      "failures": [
+        "PROFILE_NOT_FOUND",
+        "PROFILE_METADATA_INVALID"
+      ],
+      "verification": "Local State metadata and existing Preferences file; no cookie/password reads",
+      "options": [
+        "timeout",
+        "user-data-dir"
+      ]
+    },
+    "connect": {
+      "preconditions": [
+        "Existing selected root/profile",
+        "One matching PID",
+        "Explicit profile-directory on running browser",
+        "Loopback TCP CDP owned by that PID",
+        "CDP supports SystemInfo and Browser.getBrowserCommandLine"
+      ],
+      "expectedResult": "Reused instance, verified endpoint and page target list; socket disconnected without browser.close",
+      "failures": [
+        "PROFILE_UNVERIFIED",
+        "BROWSER_MISMATCH",
+        "INSTANCE_NOT_FOUND",
+        "INSTANCE_NOT_CONNECTABLE",
+        "ENDPOINT_OWNER_MISMATCH",
+        "CONNECTION_FAILED",
+        "CDP_ERROR",
+        "TIMEOUT"
+      ],
+      "verification": "OS listener owner + CDP browser PID + CDP command-line root/profile + getVersion + getTargets",
+      "options": [
+        "timeout",
+        "user-data-dir",
+        "profile-directory",
+        "instance",
+        "endpoint",
+        "browser",
+        "executable"
+      ]
+    },
+    "tabs": {
+      "preconditions": [
+        "Same identity and connection preconditions as connect"
+      ],
+      "expectedResult": "Read-only page target IDs, titles and URLs",
+      "failures": [
+        "Same as connect"
+      ],
+      "verification": "Target.getTargets from the verified browser connection",
+      "options": [
+        "timeout",
+        "user-data-dir",
+        "profile-directory",
+        "instance",
+        "endpoint",
+        "browser",
+        "executable"
+      ]
+    },
+    "open": {
+      "preconditions": [
+        "Explicit existing root and exact directory key",
+        "Optional HTTP(S) URL without credentials or exact about:blank; omitted URL defaults to about:blank",
+        "Matching inspectable TCP instance OR selected known executable and unused root",
+        "No implicit profile creation or default-root Chrome CDP launch"
+      ],
+      "expectedResult": "One new requested page (default about:blank) in reused or newly launched GUI browser; browser stays alive after CLI exit",
+      "failures": [
+        "PROFILE_NOT_FOUND",
+        "BROWSER_NOT_FOUND",
+        "BROWSER_AMBIGUOUS",
+        "BROWSER_UNSUPPORTED",
+        "PROFILE_OCCUPANCY_UNKNOWN",
+        "DEFAULT_CHROME_CDP_UNSUPPORTED",
+        "INVALID_URL",
+        "Connection failures",
+        "GUI_NOT_OBSERVED",
+        "TIMEOUT"
+      ],
+      "verification": "All connect checks + created target re-read + DOM location/readyState/body/title assertion + host window handle after operation",
+      "options": [
+        "timeout",
+        "user-data-dir",
+        "profile-directory",
+        "instance",
+        "endpoint",
+        "browser",
+        "executable",
+        "url",
+        "expect-title"
+      ]
+    },
+    "verify": {
+      "preconditions": [
+        "Verified connection",
+        "Explicit target ID and expected exact URL",
+        "Optional exact expected title"
+      ],
+      "expectedResult": "Read-only DOM, target URL and current host window evidence",
+      "failures": [
+        "VERIFICATION_SELECTION_REQUIRED",
+        "Connection failures",
+        "VERIFICATION_FAILED",
+        "GUI_NOT_OBSERVED",
+        "TIMEOUT"
+      ],
+      "verification": "Separate CLI invocation can re-read same target after opener process exits",
+      "options": [
+        "timeout",
+        "user-data-dir",
+        "profile-directory",
+        "instance",
+        "endpoint",
+        "browser",
+        "executable",
+        "target",
+        "url",
+        "expect-title"
+      ]
+    }
+  },
+  "unsupported": {
+    "profileCreation": "No create/delete/copy/seed profile commands",
+    "sessionModification": "No logout, auth copying, browser close/restart or lock deletion",
+    "pipeTakeover": "Reuse original client; this harness does not hijack remote-debugging-pipe",
+    "personalChromeWithoutCdp": "BLOCKED; never restart to enable debugging",
+    "arbitraryExecutable": "Unknown distributions are blocked rather than labeled Chrome/Chromium by guess",
+    "generalAutomation": "No arbitrary JS eval, click, input, network capture or application test framework",
+    "visualConfirmation": "Window handle is not proof that user sees the interactive desktop",
+    "guestSystemProfiles": "Guest Profile and System Profile are excluded from selectable persistent profiles"
+  },
+  "evidenceRules": {
+    "PASS": "Operation-specific observations passed",
+    "FAIL": "Command/transport/verification failed; inspect effects before retry",
+    "BLOCKED": "Precondition or unsupported connection prevents action",
+    "NOT_TESTED": "Capability/environment or human observation not exercised"
+  },
+  "transports": {
+    "cli": "Implemented; requires authorized Windows host process/GUI/network context",
+    "mcpHost": {
+      "server": "chromium_open",
+      "entrypoint": "scripts/mcp-server.mjs",
+      "commands": "Same CLI operations and guards; no arbitrary shell/eval interface",
+      "antigravity": "Preferred when run_command is isolated and CIM is blocked",
+      "verified": "Five fresh Antigravity CLI conversations on 2026-11-15"
+    }
+  }
+}
