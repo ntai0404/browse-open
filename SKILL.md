@@ -1,32 +1,33 @@
 ---
 name: browse-open
-description: Opens Chromium or the user's installed native Chrome on Windows with an explicitly selected profile. Discovers existing sessions, reuses authorized browser connections, and verifies tabs while preserving login sessions. Use the Chromium harness or the native Chrome branch according to the requested browser.
+description: Opens and controls Chromium GUI tabs on Windows through a verified CDP CLI/MCP harness. Discovers existing profiles, safely reuses sessions and verifies DOM read/fill/click without desktop input. Chrome Stable and Beta are outside its scope.
 ---
 
 # Browse Open
 
-Một skill, hai nhánh. Chọn đúng browser trước khi gọi tool có thể launch; không dùng profile automation thay cho Chrome native của người dùng.
+Chỉ hỗ trợ **Chromium**, bao gồm Chromium do Playwright phân phối. Chrome Stable/native và Chrome Beta đã bỏ khỏi phạm vi. Không gọi native_launch hay dùng executable Chrome thay thế.
 
-## Router bắt buộc
+## Chọn browser và profile
 
-1. Khảo sát tool browser/MCP, OS, executable, PID, root và khả năng kết nối bằng `node <skill-dir>/scripts/browse-open.mjs doctor` hoặc MCP `browse_open/doctor` trên host. Doctor không chứng minh browser điều khiển được.
-2. Người dùng nói Chromium hoặc Chrome for Testing: đọc [nhánh Chromium](references/chromium.md), dùng TCP harness có sẵn. Người dùng nói Chrome native, Chrome đang dùng, phiên đăng nhập cá nhân: đọc [nhánh Chrome native](references/chrome-native.md). Nếu chưa rõ và không có lựa chọn đang dùng trong task, hỏi loại browser; không tự chuyển loại.
-3. Liệt kê profile bằng `profiles --user-data-dir <root>`. Với native, mặc định khảo sát `%LOCALAPPDATA%/Google/Chrome/User Data`; xác minh executable là Chrome cài trên máy, không phải Playwright. Danh tính là executable + root + directory, displayName chỉ để đọc.
-4. Người dùng tự chọn profile native: đưa danh sách đánh số trước lần mở đầu tiên, kể cả khi chỉ có một profile; giữ nguyên lựa chọn cho các lần sau trong cùng task. Cho phép yêu cầu đổi. Nếu không có profile hợp lệ, báo BLOCKED, không tạo/copy profile. Chromium áp dụng bảng quyết định riêng trong nhánh của nó.
-5. Không có URL và chỉ yêu cầu mở GUI/tab: mở `about:blank`, không hỏi URL và không tự mở Google. Có URL task thì dùng đúng URL. Không tự chuyển sang trang trắng khi URL task lỗi.
+1. Khảo sát tool, rồi dùng MCP `browse_open/doctor` hoặc `node <skill-dir>/scripts/browse-open.mjs doctor` trên host. Antigravity có terminal cô lập ưu tiên MCP; không lặp shell khi HOST_INSPECTION_FAILED.
+2. Luôn chọn `browser: chromium`, executable Chromium thật từ doctor. Chrome khác có thể xuất hiện trong inventory để tránh đụng process/profile; chúng không được launch/attach bằng skill.
+3. Dùng profiles cho root hiện có. Danh tính là executable + user-data-dir + profileDirectory, không phải tên hiển thị. Giữ lựa chọn đã chốt; nếu có nhiều profile chưa chọn thì liệt kê đánh số và hỏi một lần. Một profile phù hợp thì dùng và nêu danh tính. Không có profile hợp lệ: BLOCKED, không tạo/copy profile.
+4. Không URL thì about:blank; có URL task thì dùng đúng URL, không hỏi lại hoặc thay URL lỗi bằng blank.
+5. Đọc [nhánh Chromium](references/chromium.md) khi cần chi tiết launch/reuse; hướng dẫn DOM bên dưới dùng chung CLI/MCP.
 
-## Giao diện
+## Contract mở và điều khiển
 
-- Chromium hoặc TCP đã cấp quyền: `scripts/browse-open.mjs`, [CLI](references/cli.md), MCP `browse_open`.
-- Mở Chrome native với profile đã chọn, không bật debugger: `scripts/native-launch.mjs`, theo [contract native](references/chrome-native.md). Đây là mở cửa sổ/tab; không phải bằng chứng điều khiển được.
-- Điều khiển native: chỉ qua kết nối browser đã cấp quyền và đã xác minh đúng profile. Tái sử dụng tool theo tab của client; không tự phát minh lệnh desktop. Không tự gọi autoConnect khi chưa biết kết nối đã được cấp quyền, vì nó có thể hiện hộp thoại.
+- MCP `browse_open` và CLI có cùng 9 command: `doctor`, `profiles`, `connect`, `tabs`, `open`, `verify`, `read`, `fill`, `click`. JSON có schemaVersion/status/data hoặc error/effects; kiểm tra exit code.
+- `open` chỉ PASS khi CDP owner PID, root/profile, DOM, URL/target và cửa sổ host cùng khớp. Gửi lệnh Start-Process hoặc có handle riêng lẻ không đủ.
+- Giữ endpoint, PID, targetId từ open. DOM commands cần đúng selection, target và **URL dự kiến chính xác** để tránh tác động nhầm tab sau redirect.
+- `read` trả snapshot giới hạn của body hoặc CSS selector. `fill` dùng selector và value, có đọc lại value để xác minh. `click` chỉ chứng minh đã gửi mouse events tới element; agent **phải read lại trạng thái mong đợi** trước khi báo task thành công. Không có arbitrary eval/desktop input.
+- Mỗi command là một CLI riêng, ngắt CDP nhưng giữ browser sống. MCP host gọi cùng harness; không nhận shell/JS tùy ý. Các tác động gửi/submit/xóa chỉ được thực hiện trong phạm vi task đã được người dùng yêu cầu.
+- DOM proof trên trang local chỉ chứng minh luồng đã chạy; không suy rộng thành Google Docs, Facebook hoặc mọi website.
 
-## Ràng buộc phiên
+## Bảo toàn session và quyền
 
-Không restart/tắt browser, xóa lock/profile, sao chép cookie, tự bật debugger, thay profile hoặc tự bấm hộp thoại cấp quyền. Người dùng hiện không chấp nhận thao tác hộp thoại: nếu không có kết nối được cấp quyền sẵn, báo `BLOCKED` cho phần điều khiển. Có thể mở native bằng launcher bình thường khi task yêu cầu mở, nhưng phải tách kết quả mở và kết quả điều khiển.
+Ưu tiên reuse instance trùng executable/root/profile và được harness xác minh. Không restart/tắt browser, xóa lock/profile, copy cookie/session, đổi profile hoặc bật autoConnect. CDP launch chỉ dùng root automation hiện có; chặn default personal roots. Không tự bấm/cố bỏ hộp thoại cấp quyền. Instance không kết nối được: BLOCKED, không chuyển sang launcher GUI-only rồi báo thành công.
 
-Không tuyên bố “Chrome native hoạt động” chỉ vì Chromium chạy được hoặc native có process/window handle. Cần kiểm tra executable, profile path, tab ID, URL/DOM và kết quả thao tác đọc lại. Thiếu một phần thì ghi FAIL/BLOCKED/NOT_TESTED đúng phạm vi. Không bắt buộc hỏi xác nhận trực quan sau mỗi lần mở.
+Phân biệt PASS/FAIL/BLOCKED/NOT_TESTED theo bằng chứng. User visual confirmation vẫn NOT_TESTED nếu chưa có; không bắt buộc hỏi lại sau mỗi lần mở.
 
-## Cài đặt và kiểm chứng
-
-Đọc [CLI và MCP](references/cli.md), [capability map](references/capabilities.json) khi cần schema/exit code. [Lịch sử kiểm chứng](references/verification.md) phân biệt runtime với mock; kết quả cũ có profile/URL sẵn không chứng minh chọn profile tự động.
+Đọc [CLI/MCP](references/cli.md) để biết tham số, [capability map](references/capabilities.json) để biết guard, [lịch sử kiểm chứng](references/verification.md) để biết phạm vi đã chạy thật.

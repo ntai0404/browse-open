@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {domAction} from './dom.mjs';
 import path from 'node:path';
 import net from 'node:net';
 import {execFileSync} from 'node:child_process';
@@ -57,20 +58,21 @@ function ps(operation, payload, remaining) {
 }
 export function host(deadline) {
   const remaining=()=>{const ms=deadline-Date.now();requireThat(ms>0,'TIMEOUT','Operation deadline exceeded',4);return ms;};
-  return {remaining, inventory:()=>ps('inventory',null,remaining),launch:o=>ps('launch',o,remaining),nativeLaunch:o=>ps('nativeLaunch',o,remaining)};
+  return {remaining, inventory:()=>ps('inventory',null,remaining),launch:o=>ps('launch',o,remaining)};
 }
 export function normalizeInventory(raw) {
   const defaultChrome=process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data') : null;
   return {...raw,processes:raw.processes.map(p=>{
     const explicit=flag(p.commandLine,'user-data-dir');
-    const inferred=!explicit && p.executable && /[\\/]Google[\\/]Chrome[\\/]Application[\\/]chrome\.exe$/i.test(p.executable) ? defaultChrome : null;
+    const inferred=!explicit && kind(p.executable)==='chrome-beta' ? (process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data')) : !explicit && kind(p.executable)==='chrome' ? defaultChrome : null;
     return {pid:p.pid,executable:p.executable,kind:kind(p.executable),sessionId:p.sessionId,handle:p.handle,title:p.title,userDataDir:explicit||inferred,rootSource:explicit?'argument':inferred?'standard-chrome-location':'unknown',profileDirectory:flag(p.commandLine,'profile-directory'),port:flag(p.commandLine,'remote-debugging-port'),pipe:/(?:^|\s)--remote-debugging-pipe(?:\s|$)/.test(p.commandLine||''),inspectable:!!p.commandLine};
   })};
 }
-export function kind(exe='') { return /[\\/]Google[\\/]Chrome[\\/]Application[\\/]chrome\.exe$/i.test(exe) ? 'chrome' : /(?:ms-playwright[\\/]chromium|[\\/]chromium(?:[\\/]|\.exe$))/i.test(exe) ? 'chromium' : 'unknown'; }
+export function kind(exe='') { return /[\\/]Google[\\/]Chrome Beta[\\/]Application[\\/]chrome\.exe$/i.test(exe) ? 'chrome-beta' : /[\\/]Google[\\/]Chrome[\\/]Application[\\/]chrome\.exe$/i.test(exe) ? 'chrome' : /(?:ms-playwright[\\/]chromium|[\\/]chromium(?:[\\/]|\.exe$))/i.test(exe) ? 'chromium' : 'unknown'; }
+
 export function binaries(inv, explicit) {
   const candidates=[explicit,...inv.processes.map(p=>p.executable),process.env.CHROMIUM_EXECUTABLE];
-  for(const base of [process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean)) candidates.push(path.join(base,'Google/Chrome/Application/chrome.exe'));
+  for(const base of [process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean)) candidates.push(path.join(base,'Google/Chrome/Application/chrome.exe'),path.join(base,'Google/Chrome Beta/Application/chrome.exe'));
   try {const req=createRequire(path.join(process.cwd(),'__browse_open__.cjs'));candidates.push(req('playwright-core').chromium.executablePath());}catch{}
   return [...new Set(candidates.filter(Boolean).filter(p=>fs.existsSync(p)).map(p=>fs.realpathSync(p)))].map(executable=>({kind:kind(executable),executable}));
 }
@@ -112,6 +114,7 @@ export async function connect(inv,selection,opts,remaining) {
   requireThat(instance.inspectable,'INSTANCE_UNINSPECTABLE','Cannot inspect browser command line');
   requireThat(!opts.executable || same(instance.executable,opts.executable),'BROWSER_MISMATCH','Executable differs from the selected instance');
   requireThat(!opts.browser || instance.kind===opts.browser,'BROWSER_MISMATCH','Chrome/Chromium kind differs from selected instance');
+  requireThat(instance.kind==='chromium','BROWSER_UNSUPPORTED','Only Chromium is supported');
   let address=opts.endpoint;
   if(!address && Number(instance.port)>0)address=`http://127.0.0.1:${instance.port}`;
   if(!address && instance.port==='0') {
@@ -161,23 +164,29 @@ export function openUrl(value='about:blank') {
 export async function perform(command,opts,adapter,deadline) {
   const remaining=()=>{const n=deadline-Date.now();requireThat(n>0,'TIMEOUT','Operation deadline exceeded',4);return n;};
   if(command==='open')opts={...opts,url:openUrl(opts.url)};
+  if(['read','fill','click'].includes(command)) {
+    requireThat(opts.target&&opts.url,'VERIFICATION_SELECTION_REQUIRED','DOM commands require --target and expected exact --url',2);
+    opts={...opts,url:openUrl(opts.url)};
+    if(command!=='read')requireThat(opts.selector,'SELECTOR_REQUIRED','Pass --selector',2);
+    if(command==='fill')requireThat(opts.value!==undefined,'VALUE_REQUIRED','Pass --value, including empty string to clear',2);
+  }
   if(command==='profiles')return {profiles:profiles(opts['user-data-dir'])};
   let inv=normalizeInventory(await adapter.inventory());
-  if(command==='doctor')return {os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
+  if(command==='doctor')return {os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
   const selection=profile(opts['user-data-dir'],opts['profile-directory']);
-  if(opts.browser)requireThat(['chrome','chromium'].includes(opts.browser),'INVALID_BROWSER','Use chrome or chromium',2);
+  if(opts.browser)requireThat(opts.browser==='chromium','INVALID_BROWSER','Use chromium; Chrome Stable and Beta are not supported',2);
   if(opts.executable)requireThat(fs.existsSync(opts.executable),'BROWSER_NOT_FOUND','Selected executable does not exist');
   let existing=matching(inv,selection), launched=false;
   if(command==='open' && existing.length===0 && !opts.instance && !opts.endpoint) {
-    requireThat(opts.browser || opts.executable,'BROWSER_SELECTION_REQUIRED','Specify --browser chrome|chromium or --executable',2);
+    requireThat(opts.browser || opts.executable,'BROWSER_SELECTION_REQUIRED','Specify --browser chromium or --executable',2);
     const choices=binaries(inv,opts.executable).filter(b=>(!opts.browser||b.kind===opts.browser)&&(!opts.executable||same(b.executable,opts.executable)));
     requireThat(choices.length>0,'BROWSER_NOT_FOUND','No matching browser executable found');
     requireThat(choices.length===1,'BROWSER_AMBIGUOUS','Several executables match; pass --executable');
     const exe=choices[0].executable;
-    requireThat(['chrome','chromium'].includes(choices[0].kind),'BROWSER_UNSUPPORTED','Executable is not a discovered Chrome/Chromium distribution');
+    requireThat(choices[0].kind==='chromium','BROWSER_UNSUPPORTED','Executable is not a discovered Chromium distribution');
     requireThat(!inv.processes.some(p=>!p.inspectable || (!p.userDataDir && same(p.executable,exe))),'PROFILE_OCCUPANCY_UNKNOWN','A running browser has unknown profile ownership; cannot safely launch');
-    const chromeRoot=process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data');
-    requireThat(!(choices[0].kind==='chrome'&&same(selection.userDataDir,chromeRoot)),'DEFAULT_CHROME_CDP_UNSUPPORTED','Modern Chrome disables CDP on its default user-data directory; reuse an authorized connection');
+    const protectedRoots=process.env.LOCALAPPDATA?['Google/Chrome/User Data','Google/Chrome Beta/User Data','Chromium/User Data'].map(p=>path.join(process.env.LOCALAPPDATA,p)):[];
+    requireThat(!protectedRoots.some(root=>same(selection.userDataDir,root)),'DEFAULT_PROFILE_CDP_UNSUPPORTED','Use an explicitly selected existing automation root; do not enable CDP on a default personal root');
     const port=await freePort();
     const started=await adapter.launch({executable:exe,root:selection.userDataDir,profile:selection.profileDirectory,port});
     opts={...opts,executable:exe,instance:String(started.pid)};launched=true;
@@ -195,6 +204,7 @@ export async function perform(command,opts,adapter,deadline) {
       const {targetInfos}=await cdp.call('Target.getTargets');
       return {selection,instance,endpoint:address,reused:true,tabs:targetInfos.filter(t=>t.type==='page').map(t=>({targetId:t.targetId,title:t.title,url:t.url}))};
     }
+    if(['read','fill','click'].includes(command))return await domAction(command,opts,cdp,instance,address,remaining,adapter.effects);
     let targetId=opts.target;
     if(command==='open') {
       const created=await cdp.call('Target.createTarget',{url:opts.url});targetId=created.targetId;

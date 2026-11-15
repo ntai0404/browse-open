@@ -121,3 +121,10 @@ Có 8 lần agent tự kiểm tra connect và nhận BLOCKED / INSTANCE_NOT_CONN
 Bằng chứng gốc local: `../artifacts/antigravity-native-1794758904403/acceptance.json`, `results.json`, bookend doctor, 10 file round-N.ndjson và 10 file round-N.cleanup.json. Raw logs/profile không được đưa vào repo hay ZIP. Các pilot và đợt bị gián đoạn trước đó được lưu riêng, không tính vào 10/10 này.
 
 Tái hiện: `node <skill-dir>/tests/antigravity-native.mjs 10`, chỉ khi được phép mở/đóng browser thử. Runner này dành cho môi trường dự án đã cấu hình Antigravity/MCP và lựa chọn native Profile 1; nó từ chối chạy nếu root native đang được dùng, rồi cleanup browser mới của từng lượt. Đây là hành vi test-only, không thêm lệnh close vào utility thông thường.
+
+
+## Chromium-only — 2026-11-16
+
+Theo yêu cầu người dùng, bỏ nhánh Chrome Stable/native và Chrome Beta. Lịch sử các nhánh đó ở trên chỉ là bằng chứng cũ, không phải capability hiện tại. Bộ cài Beta chưa cài thành công (MSI cần quyền administrator); không tiếp tục cài hay tạo profile Beta.
+
+PASS: 26/26 boundary/CLI/MCP tests. PASS runtime qua MCP host: Chromium PID 15392, root automation có sẵn `secrets/chrome-chromium-profile` / Default; open trang local, fill #value, click #apply, read #result đọc đúng `Chromium DOM verified`, độc lập server nhận 1 event. Raw proof local `artifacts/chromium-dom.json`; không đưa vào repo/ZIP. Giữ browser sau test. Phạm vi là trang local, chưa chứng minh Google Docs/Facebook hay mọi website; chưa chạy lại batch Antigravity với DOM commands.

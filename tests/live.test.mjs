@@ -20,7 +20,7 @@ test('LIVE: open existing selected profile, reconnect after CLI exit, verify DOM
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   t.after(()=>new Promise(resolve=>{server.close(resolve);for(const socket of sockets)socket.destroy();}));
   const url=`http://127.0.0.1:${server.address().port}/proof`;
-  const selection=['--user-data-dir',root,'--profile-directory',process.env.CHROMIUM_OPEN_PROFILE||'Default','--browser','chromium','--executable',executable,'--timeout','45000'];
+  const selection=['--user-data-dir',root,'--profile-directory',process.env.CHROMIUM_OPEN_PROFILE||'Default','--browser',process.env.BROWSE_OPEN_BROWSER||'chromium','--executable',executable,'--timeout','45000'];
   const listed=await run(['profiles','--user-data-dir',root]);
   assert.ok(listed.data.profiles.some(p=>p.profileDirectory===(process.env.CHROMIUM_OPEN_PROFILE||'Default')&&p.exists));
   const opened=await run(['open',...selection,'--url',url,'--expect-title',marker]);

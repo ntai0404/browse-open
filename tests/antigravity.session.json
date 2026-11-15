@@ -8,7 +8,9 @@
       "mcp(browse_open/tabs)",
       "mcp(browse_open/open)",
       "mcp(browse_open/verify)",
-      "mcp(browse_open/native_launch)"
+      "mcp(browse_open/read)",
+      "mcp(browse_open/fill)",
+      "mcp(browse_open/click)"
     ]
   }
 }
