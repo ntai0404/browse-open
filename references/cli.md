@@ -1,19 +1,24 @@
-# CLI và MCP
+# CLI and MCP
 
-Node >=22, Windows PowerShell, host có quyền process/GUI/loopback. Không cần npm dependencies. Entry point `scripts/browse-open.mjs`; `--help` trả danh sách command/options chuẩn. Tham số theo cặp `--name value`, không dùng `--name=value`.
+Windows, Node >=22, PowerShell and authorized host process/GUI/loopback access. No npm dependencies. Entry point scripts/browse-open.mjs. Use --help for machine-readable commands/options. Arguments are --name value pairs, not --name=value.
 
-## Command
+## Commands
 
-- doctor: chỉ kiểm kê OS, executable/kind, instance và root; Chrome Stable có thể được thấy trong inventory nhưng không thuộc nhánh launch được hỗ trợ.
-- profiles: `--user-data-dir ROOT`; directory key + tên hiển thị; không tạo profile.
-- connect/tabs: root/profile, optional instance/endpoint/browser/executable; kiểm tra owner PID, CDP browser PID và command-line root/profile.
-- open: selection như trên; `--url` optional mặc định about:blank, `--expect-title` optional. Browser kind chỉ chromium. Reuse đúng instance hoặc launch đúng executable với root automation chưa dùng. Default personal roots bị chặn.
-- verify: selection + `--target ID --url EXACT` và optional expect-title.
-- read: selection + target/url, optional `--selector CSS`; trả text/value bounded, không trả password/file value.
-- fill: selection + target/url + selector + `--value TEXT`; value rỗng hợp lệ. Dùng Input.insertText rồi kiểm tra DOM readback. Chỉ input/textarea thông thường.
-- click: selection + target/url + selector; kiểm tra khả năng tương tác rồi dispatch input vào element; cần read lại kết quả mong muốn.
+- doctor: inventory OS, executable kinds, instances, roots and transport capabilities; not a browser health claim.
+- profiles: --user-data-dir ROOT; numbered directory IDs and display names; no creation.
+- connect/tabs: root/profile plus optional instance/endpoint/browser/executable; verify OS/CDP owner and selected profile. Native Chrome may create/close its own temporary profile-path verification tab.
+- open: same selection, optional url (default about:blank), expect-title and port. Browser is chromium or chrome. Reuse matching instance or launch with selected unused non-default data root. Never launch CDP on default personal roots.
+- verify: selection plus --target ID --url EXACT, optional expect-title.
+- read: selection plus target/url, optional --selector CSS; bounded text/value snapshot excluding password/file values.
+- fill: selection plus target/url/selector/--value TEXT; empty value clears. Input.insertText and exact DOM value readback. Ordinary input/textarea only.
+- click: selection plus target/url/selector; actionable element check and CDP mouse events. Read the expected resulting state afterward.
+- copy-profile: --user-data-dir ROOT --profile-directory DIRECTORY --destination-root NEW_ABSOLUTE_ROOT --copy-authorized yes, optional timeout. Requires existing user authorization. Best-effort copy of selected profile and Local State, no overwrite/source modification. See [native Chrome](chrome-native.md).
 
-Mọi command có timeout mặc định 20000ms, range 500..120000. stdout đúng một JSON, schemaVersion 1, status, data/error, effects. Exit 0 PASS, 2 invalid input, 3 BLOCKED precondition, 4 connection/timeout, 5 verification/internal error. Đọc effects cả khi FAIL để tránh retry tạo tab/click trùng. Click timeout không chứng minh chưa click.
+All commands: default timeout 20000ms, range 500..120000. Exactly one stdout JSON, schemaVersion 1, status, data/error, effects. Exit 0 PASS, 2 invalid arguments, 3 BLOCKED precondition, 4 connection/timeout, 5 verification/internal error. Inspect effects even on failure before retrying a mutating command; a click timeout does not prove no click occurred.
+
+Browser values: chromium or chrome; Beta unsupported. Open --port 4444 selects a free loopback port; other commands use --endpoint http://127.0.0.1:4444. Port range 1024..65535. Occupied/mismatched ports are blocked without terminating processes. Omitted port selects a free port automatically.
+
+copy-profile JSON: copiedFiles, omissions, complete, consistency, loginSession. Manifest in destination/browse-open-copy.json. Partial copy/timeout identifies destination in effects.profileCopyRoot. Required metadata can exist even when cookies/session files were omitted; copy PASS does not prove login.
 
 ## MCP host
 
@@ -21,16 +26,18 @@ Mọi command có timeout mặc định 20000ms, range 500..120000. stdout đún
 agy mcp add browse_open -- node "<absolute-skill-dir>/scripts/mcp-server.mjs"
 ```
 
-Bắt đầu conversation mới khi nâng cấp để tải lại schema. Server có đúng 9 command nêu trên. Không có native_launch, arbitrary eval, shell hoặc close/restart. Antigravity ưu tiên MCP host khi run_command bị cô lập; nếu host cũng không đủ quyền thì BLOCKED.
+Start a new agent conversation after schema upgrades. Same ten commands as CLI. No native_launch, arbitrary eval, shell, close/restart or pipe takeover. Prefer MCP host when Antigravity run_command is isolated; if host is unavailable report BLOCKED.
 
-Ví dụ: `{"ServerName":"browse_open","ToolName":"fill","Arguments":{"browser":"chrome-beta","userDataDir":"<root>","profileDirectory":"Default","instance":123,"endpoint":"http://127.0.0.1:9222","target":"<id>","url":"http://127.0.0.1:8080/proof","selector":"#value","value":"proof"}}`.
+MCP uses userDataDir/profileDirectory/executable/browser/instance/endpoint/url/target/expectTitle/selector/value. copy-profile adds destinationRoot/copyAuthorized. Open adds port (string, e.g. "4444"). timeout and instance are integers. Unknown fields are rejected.
 
-Giữ browser sau disconnect. Không xóa lock, restart Chrome, chiếm pipe hay đổi profile để né lỗi. Endpoint phải loopback HTTP host:port; owner phải đúng browser PID. Redirect: xác minh URL đích rõ ràng, không tự chấp nhận mọi redirect.
+Example read arguments: {"browser":"chrome","userDataDir":"<selected-root>","profileDirectory":"Profile 1","endpoint":"http://127.0.0.1:4444","target":"<target-id>","url":"http://127.0.0.1:8080/proof","selector":"#result"}.
 
-## Tests
+Disconnect leaves browser alive. No lock deletion, browser restart, permission-dialog bypass or profile substitution. Endpoint must be loopback HTTP with explicit port owned by the selected PID. After a redirect, inspect and assert the actual intended URL rather than accepting arbitrary redirects.
 
-`node --test tests/harness.test.mjs tests/mcp.test.mjs tests/chromium.test.mjs` cho boundary tests; mock được ghi rõ, không phải runtime browser proof.
+Native without enable-automation: a specific Browser.getBrowserCommandLine rejection allows a temporary chrome://version profile-path check. verification.profileCommandLine covers host command-line selection cross-checked using CDP command line or the version-page path.
 
-`tests/live.test.mjs` là opt-in với CHROMIUM_OPEN_ROOT/PROFILE/EXE; chọn BROWSE_OPEN_BROWSER=chromium cho Beta. Không suy rộng bài kiểm thử trang local sang mọi website.
+## Verification
 
-Các batch Antigravity Chromium trong tests là tool nghiệm thu riêng có profile/project/model assumptions. Cold runner đóng browser thử theo chấp thuận riêng; không chạy trên profile đang làm việc. Các runner Chrome Stable/native đã bỏ; log cũ giữ local và không đưa vào ZIP/repo. Xem [verification](verification.md) để phân biệt lịch sử với phiên bản hiện tại.
+Run node --test tests/harness.test.mjs tests/mcp.test.mjs tests/chromium.test.mjs tests/profile-copy.test.mjs tests/native.test.mjs on an authorized Windows host. Mocked boundaries are unit evidence, not live browser proof.
+
+Existing tests/live.test.mjs is opt-in using CHROMIUM_OPEN_ROOT/PROFILE/EXE. Historical Antigravity batch runners have project/model/profile assumptions and separate cleanup authorization. Do not run cold cleanup on a working user browser. See [evidence](verification.md) for observed scope; no general website acceptance is implied.

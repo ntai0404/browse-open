@@ -1,4 +1,4 @@
 interface:
   display_name: "Browse Open"
-  short_description: "Open and control Chromium"
-  default_prompt: "Use $browse-open to discover browsers and profiles, reuse the selected session, and open and control a verified Chromium tab."
+  short_description: "Control Chromium and native Chrome tabs"
+  default_prompt: "Use $browse-open to discover browsers and profiles, reuse the selected session, and open and control a verified Chromium or native Chrome tab, preserving the selected profile and reporting profile-copy limitations."

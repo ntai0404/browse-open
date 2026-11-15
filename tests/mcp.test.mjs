@@ -5,7 +5,7 @@ test('MCP advertises only implemented CLI operations',async()=>{
   const initialized=await dispatch({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2024-11-05'}});
   assert.equal(initialized.result.serverInfo.name,'browse-open');
   const listed=await dispatch({jsonrpc:'2.0',id:2,method:'tools/list'});
-  assert.deepEqual(listed.result.tools.map(t=>t.name),['doctor','profiles','connect','tabs','open','verify','read','fill','click']);
+  assert.deepEqual(listed.result.tools.map(t=>t.name),['doctor','profiles','connect','tabs','open','verify','read','fill','click','copy-profile']);
   assert.equal(tools.find(t=>t.name==='open').inputSchema.additionalProperties,false);
   assert.equal(tools.find(t=>t.name==='open').annotations.openWorldHint,true);
 });
@@ -29,3 +29,8 @@ test('MCP open without URL reaches the CLI and preserves missing-profile BLOCKED
 });
 
 test('retired native launcher is not callable',async()=>{await assert.rejects(invoke('native_launch',{}),/Unknown tool/);});
+
+test('profile copy MCP requires explicit authorization and destination',async()=>{
+ await assert.rejects(invoke('copy-profile',{userDataDir:'root',profileDirectory:'Default'}),/Missing argument/);
+ assert.equal(tools.find(t=>t.name==='copy-profile').annotations.readOnlyHint,false);
+});

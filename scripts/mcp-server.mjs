@@ -4,8 +4,8 @@ import {fileURLToPath} from 'node:url';
 import readline from 'node:readline';
 import map from '../references/capabilities.json' with {type:'json'};
 const cli=fileURLToPath(new URL('./browse-open.mjs',import.meta.url));
-const fields={timeout:'timeout',browser:'browser',executable:'executable',userDataDir:'user-data-dir',profileDirectory:'profile-directory',instance:'instance',endpoint:'endpoint',url:'url',target:'target',expectTitle:'expect-title',selector:'selector',value:'value'};
-export const tools=Object.entries(map.commands).map(([name,cap])=>({name,description:cap.expectedResult,inputSchema:{type:'object',properties:Object.fromEntries(Object.entries(fields).filter(([,option])=>cap.options.includes(option)).map(([field])=>[field,field==='timeout'?{type:'integer',minimum:500,maximum:120000}:field==='instance'?{type:'integer',minimum:1}:{type:'string',minLength:field==='value'?0:1}])),required:name==='doctor'?[]:name==='profiles'?['userDataDir']:['userDataDir','profileDirectory',...(['verify','read','fill','click'].includes(name)?['target','url']:[]),...(['fill','click'].includes(name)?['selector']:[]),...(name==='fill'?['value']:[])],additionalProperties:false},annotations:{readOnlyHint:!['open','fill','click'].includes(name),destructiveHint:false,openWorldHint:['open','fill','click'].includes(name)}}));
+const fields={timeout:'timeout',browser:'browser',executable:'executable',userDataDir:'user-data-dir',profileDirectory:'profile-directory',instance:'instance',endpoint:'endpoint',url:'url',target:'target',expectTitle:'expect-title',selector:'selector',value:'value',port:'port',destinationRoot:'destination-root',copyAuthorized:'copy-authorized'};
+export const tools=Object.entries(map.commands).map(([name,cap])=>({name,description:cap.expectedResult,inputSchema:{type:'object',properties:Object.fromEntries(Object.entries(fields).filter(([,option])=>cap.options.includes(option)).map(([field])=>[field,field==='timeout'?{type:'integer',minimum:500,maximum:120000}:field==='instance'?{type:'integer',minimum:1}:{type:'string',minLength:field==='value'?0:1}])),required:name==='doctor'?[]:name==='profiles'?['userDataDir']:['userDataDir','profileDirectory',...(['verify','read','fill','click'].includes(name)?['target','url']:[]),...(['fill','click'].includes(name)?['selector']:[]),...(name==='fill'?['value']:[]),...(name==='copy-profile'?['destinationRoot','copyAuthorized']:[])],additionalProperties:false},annotations:{readOnlyHint:!['open','fill','click','copy-profile','connect','tabs','verify','read'].includes(name),destructiveHint:false,openWorldHint:['open','fill','click','copy-profile','connect','tabs','verify','read'].includes(name)}}));
 export async function invoke(name,args={}) {
   const tool=tools.find(t=>t.name===name);
   if(!tool)throw Error('Unknown tool');
@@ -30,7 +30,7 @@ export async function dispatch(request) {
   if(request.id===undefined)return;
   let result;
   try {
-    if(request.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'browse-open',version:'2.0.0'}};
+    if(request.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'browse-open',version:'2.1.0'}};
     else if(request.method==='ping')result={};
     else if(request.method==='tools/list')result={tools};
     else if(request.method==='tools/call') {const value=await invoke(request.params?.name,request.params?.arguments);result={content:[{type:'text',text:JSON.stringify(value)}],structuredContent:value,isError:value.status!=='PASS'};}

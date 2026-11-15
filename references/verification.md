@@ -128,3 +128,13 @@ Tái hiện: `node <skill-dir>/tests/antigravity-native.mjs 10`, chỉ khi đư�
 Theo yêu cầu người dùng, bỏ nhánh Chrome Stable/native và Chrome Beta. Lịch sử các nhánh đó ở trên chỉ là bằng chứng cũ, không phải capability hiện tại. Bộ cài Beta chưa cài thành công (MSI cần quyền administrator); không tiếp tục cài hay tạo profile Beta.
 
 PASS: 26/26 boundary/CLI/MCP tests. PASS runtime qua MCP host: Chromium PID 15392, root automation có sẵn `secrets/chrome-chromium-profile` / Default; open trang local, fill #value, click #apply, read #result đọc đúng `Chromium DOM verified`, độc lập server nhận 1 event. Raw proof local `artifacts/chromium-dom.json`; không đưa vào repo/ZIP. Giữ browser sau test. Phạm vi là trang local, chưa chứng minh Google Docs/Facebook hay mọi website; chưa chạy lại batch Antigravity với DOM commands.
+
+
+## 2026-11-16: native Chrome through authorized profile copy / TCP 4444
+
+- PASS: 32 automated tests (CLI/MCP boundaries, selected-profile copying, destination/authorization guards, occupied port and instance-port mismatch). Fixture and mocked tests are not browser proof.
+- PASS: updated MCP/CLI reused actual installed Chrome PID 1552, verified port 4444 OS owner and CDP browser PID, and cross-checked selected Profile 1 root via temporary chrome://version fallback (instance lacks enable-automation).
+- PASS: updated open, fill, click, read on a dedicated local HTTP test page; exact input/output readback plus independent server callback count 1. Evidence kept locally in artifacts/native-cdp-4444-harness.json; excluded from release.
+- PASS: skill-creator quick_validate.
+- PARTIAL COPY: earlier authorized copy copied 8520 files, 18 locked-file omissions including Cookies/session. Source browser left running. New copy-profile implementation additionally skips known caches and writes an omissions manifest. Full real-profile copy using the new command NOT_TESTED; filesystem tests exercise its actual copy behavior.
+- NOT_TESTED: authentication preservation, new-process native launch via updated CLI (live test reused existing process), new Antigravity end-to-end batch, every external website. Historical native GUI counts do not establish this branch's DOM reliability across ten trials.

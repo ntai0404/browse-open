@@ -1,33 +1,34 @@
 ---
 name: browse-open
-description: Opens and controls Chromium GUI tabs on Windows through a verified CDP CLI/MCP harness. Discovers existing profiles, safely reuses sessions and verifies DOM read/fill/click without desktop input. Chrome Stable and Beta are outside its scope.
+description: Open and control Chromium or native Google Chrome GUI tabs on Windows through verified CDP. Discover profiles, reuse sessions or explicitly copy a selected Chrome profile to a separate root, and verify DOM read/fill/click.
 ---
 
 # Browse Open
 
-Chỉ hỗ trợ **Chromium**, bao gồm Chromium do Playwright phân phối. Chrome Stable/native và Chrome Beta đã bỏ khỏi phạm vi. Không gọi native_launch hay dùng executable Chrome thay thế.
+Two variants: **Chromium** (`browser: chromium`) and installed **native Google Chrome** (`browser: chrome`). Chrome Beta is unsupported. Never silently substitute a different browser or profile.
 
-## Chọn browser và profile
+## Choose browser and profile
 
-1. Khảo sát tool, rồi dùng MCP `browse_open/doctor` hoặc `node <skill-dir>/scripts/browse-open.mjs doctor` trên host. Antigravity có terminal cô lập ưu tiên MCP; không lặp shell khi HOST_INSPECTION_FAILED.
-2. Luôn chọn `browser: chromium`, executable Chromium thật từ doctor. Chrome khác có thể xuất hiện trong inventory để tránh đụng process/profile; chúng không được launch/attach bằng skill.
-3. Dùng profiles cho root hiện có. Danh tính là executable + user-data-dir + profileDirectory, không phải tên hiển thị. Giữ lựa chọn đã chốt; nếu có nhiều profile chưa chọn thì liệt kê đánh số và hỏi một lần. Một profile phù hợp thì dùng và nêu danh tính. Không có profile hợp lệ: BLOCKED, không tạo/copy profile.
-4. Không URL thì about:blank; có URL task thì dùng đúng URL, không hỏi lại hoặc thay URL lỗi bằng blank.
-5. Đọc [nhánh Chromium](references/chromium.md) khi cần chi tiết launch/reuse; hướng dẫn DOM bên dưới dùng chung CLI/MCP.
+1. Inspect available tools, then call MCP `browse_open/doctor` or `node <skill-dir>/scripts/browse-open.mjs doctor` on the host. Prefer the MCP host when Antigravity terminal inspection is isolated; do not repeat a failing isolated shell.
+2. Select the executable discovered by doctor for the requested variant. Read [Chromium](references/chromium.md) for Chromium; read [native Chrome](references/chrome-native.md) before selecting a Chrome root, copying data or choosing a port.
+3. Call profiles on an existing root. Identity is executable + user-data-dir + profileDirectory; display name is not a directory. Preserve the user's prior selection. If several profiles remain eligible and none was selected, list numbered identities and ask once. One eligible profile can be used with its identity stated. No eligible profile: BLOCKED; do not initialize one.
+4. Use the task URL, otherwise about:blank. Do not ask for a URL merely because it was omitted. Keep the requested port when specified.
 
-## Contract mở và điều khiển
+## Execution contract
 
-- MCP `browse_open` và CLI có cùng 9 command: `doctor`, `profiles`, `connect`, `tabs`, `open`, `verify`, `read`, `fill`, `click`. JSON có schemaVersion/status/data hoặc error/effects; kiểm tra exit code.
-- `open` chỉ PASS khi CDP owner PID, root/profile, DOM, URL/target và cửa sổ host cùng khớp. Gửi lệnh Start-Process hoặc có handle riêng lẻ không đủ.
-- Giữ endpoint, PID, targetId từ open. DOM commands cần đúng selection, target và **URL dự kiến chính xác** để tránh tác động nhầm tab sau redirect.
-- `read` trả snapshot giới hạn của body hoặc CSS selector. `fill` dùng selector và value, có đọc lại value để xác minh. `click` chỉ chứng minh đã gửi mouse events tới element; agent **phải read lại trạng thái mong đợi** trước khi báo task thành công. Không có arbitrary eval/desktop input.
-- Mỗi command là một CLI riêng, ngắt CDP nhưng giữ browser sống. MCP host gọi cùng harness; không nhận shell/JS tùy ý. Các tác động gửi/submit/xóa chỉ được thực hiện trong phạm vi task đã được người dùng yêu cầu.
-- DOM proof trên trang local chỉ chứng minh luồng đã chạy; không suy rộng thành Google Docs, Facebook hoặc mọi website.
+CLI and MCP expose ten operations: doctor, profiles, connect, tabs, open, verify, read, fill, click, copy-profile. See [CLI/MCP](references/cli.md) and [capability map](references/capabilities.json). Each call returns JSON schemaVersion/status/data or error/effects and an exit code.
 
-## Bảo toàn session và quyền
+- Reuse a matching, verified TCP CDP instance. Open requires matching OS listener owner, CDP browser PID, selected root/profile, DOM/target URL and host window evidence. Starting a process or observing a window alone is insufficient.
+- Native Chrome without enable-automation can require a temporary chrome://version verification tab. The harness closes only that tab. Identity is checked against its reported profile path and host command line.
+- Keep endpoint, PID and targetId. DOM operations require the exact expected URL and target. Read returns a bounded snapshot; fill checks exact input value. After click, read the expected resulting state before reporting success.
+- No arbitrary JavaScript or desktop input is exposed. External sends/submissions/deletions need task authorization. Disconnecting CLI/MCP leaves the browser alive.
 
-Ưu tiên reuse instance trùng executable/root/profile và được harness xác minh. Không restart/tắt browser, xóa lock/profile, copy cookie/session, đổi profile hoặc bật autoConnect. CDP launch chỉ dùng root automation hiện có; chặn default personal roots. Không tự bấm/cố bỏ hộp thoại cấp quyền. Instance không kết nối được: BLOCKED, không chuyển sang launcher GUI-only rồi báo thành công.
+## Preserve sessions
 
-Phân biệt PASS/FAIL/BLOCKED/NOT_TESTED theo bằng chứng. User visual confirmation vẫn NOT_TESTED nếu chưa có; không bắt buộc hỏi lại sau mỗi lần mở.
+Do not restart/close the user's browser, delete locks/profiles, change selection, bypass permission dialogs, or enable autoConnect. Default personal data roots cannot be launched through port CDP.
 
-Đọc [CLI/MCP](references/cli.md) để biết tham số, [capability map](references/capabilities.json) để biết guard, [lịch sử kiểm chứng](references/verification.md) để biết phạm vi đã chạy thật.
+A native Chrome **copy** to a separate root is supported only after the user explicitly requests/allows copying that selected profile. Use copy-profile with a fresh destination in an ignored secrets directory. Once authorized and selected, proceed without asking again. The source is untouched; do not decrypt cookies or bypass file locks.
+
+Copy PASS means required metadata exists in the destination, not that all files or login sessions survived. Read omissions, complete, consistency and loginSession. A live source may have locked cookie/session files. A copied profile is independent and does not sync back to the original. Report copy, GUI/CDP/DOM and authentication results separately.
+
+Use PASS/FAIL/BLOCKED/NOT_TESTED according to evidence. A local DOM test does not prove Facebook, Google Docs or all sites. User visual confirmation remains NOT_TESTED without observation; do not require a repeated confirmation question after each successful open. See [verification evidence](references/verification.md).

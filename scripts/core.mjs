@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import {domAction} from './dom.mjs';
+import {copyProfile} from './profile-copy.mjs';
 import path from 'node:path';
 import net from 'node:net';
 import {execFileSync} from 'node:child_process';
@@ -114,7 +115,8 @@ export async function connect(inv,selection,opts,remaining) {
   requireThat(instance.inspectable,'INSTANCE_UNINSPECTABLE','Cannot inspect browser command line');
   requireThat(!opts.executable || same(instance.executable,opts.executable),'BROWSER_MISMATCH','Executable differs from the selected instance');
   requireThat(!opts.browser || instance.kind===opts.browser,'BROWSER_MISMATCH','Chrome/Chromium kind differs from selected instance');
-  requireThat(instance.kind==='chromium','BROWSER_UNSUPPORTED','Only Chromium is supported');
+  requireThat(['chromium','chrome'].includes(instance.kind),'BROWSER_UNSUPPORTED','Use Chromium or Chrome native; Beta is unsupported');
+  if(opts.port)requireThat(Number(instance.port)===Number(opts.port),'PORT_MISMATCH','Existing browser uses a different port; do not restart it');
   let address=opts.endpoint;
   if(!address && Number(instance.port)>0)address=`http://127.0.0.1:${instance.port}`;
   if(!address && instance.port==='0') {
@@ -134,8 +136,22 @@ export async function connect(inv,selection,opts,remaining) {
   try {
     const processes=await cdp.call('SystemInfo.getProcessInfo');
     requireThat(processes.processInfo.some(p=>p.type==='browser'&&p.id===instance.pid),'BROWSER_PID_MISMATCH','CDP process ID does not match OS owner');
-    const command=await cdp.call('Browser.getBrowserCommandLine');
-    requireThat(command.arguments.some(a=>a===`--profile-directory=${selection.profileDirectory}`) && command.arguments.some(a=>a.startsWith('--user-data-dir=')&&same(a.slice(16),selection.userDataDir)),'PROFILE_MISMATCH','CDP command line does not match selected root/profile');
+    let command;
+    try {command=await cdp.call('Browser.getBrowserCommandLine');}
+    catch(e) {
+      if(instance.kind!=='chrome'||e.code!=='CDP_ERROR'||!e.message.includes('--enable-automation'))throw e;
+      // Existing native Chrome may omit enable-automation. Verify its actual profile path.
+      const {targetId}=await cdp.call('Target.createTarget',{url:'chrome://version/'});
+      try {
+        const {sessionId}=await cdp.call('Target.attachToTarget',{targetId,flatten:true});
+        while(true) {
+          const r=await cdp.call('Runtime.evaluate',{expression:'document.querySelector("#profile_path")?.textContent',returnByValue:true},sessionId);
+          if(r.result.value) {requireThat(same(r.result.value.trim(),path.join(selection.userDataDir,selection.profileDirectory)),'PROFILE_MISMATCH','Chrome version page reports a different profile path');break;}
+          remaining();await new Promise(r=>setTimeout(r,100));
+        }
+      } finally {await cdp.call('Target.closeTarget',{targetId});}
+    }
+    if(command)requireThat(command.arguments.some(a=>a===`--profile-directory=${selection.profileDirectory}`) && command.arguments.some(a=>a.startsWith('--user-data-dir=')&&same(a.slice(16),selection.userDataDir)),'PROFILE_MISMATCH','CDP command line does not match selected root/profile');
     await cdp.call('Browser.getVersion');
     return {cdp,instance,address};
   } catch(e){cdp.disconnect();throw e;}
@@ -170,24 +186,30 @@ export async function perform(command,opts,adapter,deadline) {
     if(command!=='read')requireThat(opts.selector,'SELECTOR_REQUIRED','Pass --selector',2);
     if(command==='fill')requireThat(opts.value!==undefined,'VALUE_REQUIRED','Pass --value, including empty string to clear',2);
   }
+  if(command==='copy-profile')return await copyProfile(opts,remaining,adapter.effects);
+  if(opts.port!==undefined)requireThat(/^[0-9]+$/.test(opts.port)&&Number(opts.port)>=1024&&Number(opts.port)<=65535,'INVALID_PORT','port must be 1024..65535',2);
   if(command==='profiles')return {profiles:profiles(opts['user-data-dir'])};
   let inv=normalizeInventory(await adapter.inventory());
   if(command==='doctor')return {os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
   const selection=profile(opts['user-data-dir'],opts['profile-directory']);
-  if(opts.browser)requireThat(opts.browser==='chromium','INVALID_BROWSER','Use chromium; Chrome Stable and Beta are not supported',2);
+  if(opts.browser)requireThat(['chromium','chrome'].includes(opts.browser),'INVALID_BROWSER','Use chromium or chrome; Beta is unsupported',2);
   if(opts.executable)requireThat(fs.existsSync(opts.executable),'BROWSER_NOT_FOUND','Selected executable does not exist');
   let existing=matching(inv,selection), launched=false;
   if(command==='open' && existing.length===0 && !opts.instance && !opts.endpoint) {
-    requireThat(opts.browser || opts.executable,'BROWSER_SELECTION_REQUIRED','Specify --browser chromium or --executable',2);
+    requireThat(opts.browser || opts.executable,'BROWSER_SELECTION_REQUIRED','Specify --browser chromium|chrome or --executable',2);
     const choices=binaries(inv,opts.executable).filter(b=>(!opts.browser||b.kind===opts.browser)&&(!opts.executable||same(b.executable,opts.executable)));
     requireThat(choices.length>0,'BROWSER_NOT_FOUND','No matching browser executable found');
     requireThat(choices.length===1,'BROWSER_AMBIGUOUS','Several executables match; pass --executable');
     const exe=choices[0].executable;
-    requireThat(choices[0].kind==='chromium','BROWSER_UNSUPPORTED','Executable is not a discovered Chromium distribution');
+    requireThat(['chromium','chrome'].includes(choices[0].kind),'BROWSER_UNSUPPORTED','Executable is not discovered Chromium or Chrome native');
     requireThat(!inv.processes.some(p=>!p.inspectable || (!p.userDataDir && same(p.executable,exe))),'PROFILE_OCCUPANCY_UNKNOWN','A running browser has unknown profile ownership; cannot safely launch');
     const protectedRoots=process.env.LOCALAPPDATA?['Google/Chrome/User Data','Google/Chrome Beta/User Data','Chromium/User Data'].map(p=>path.join(process.env.LOCALAPPDATA,p)):[];
     requireThat(!protectedRoots.some(root=>same(selection.userDataDir,root)),'DEFAULT_PROFILE_CDP_UNSUPPORTED','Use an explicitly selected existing automation root; do not enable CDP on a default personal root');
-    const port=await freePort();
+    const port=opts.port?Number(opts.port):await freePort();
+    if(opts.port) {
+      try {await new Promise((resolve,reject)=>{const server=net.createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolve));});}
+      catch {throw new Failure('PORT_IN_USE','Requested loopback port is unavailable; do not stop its owner');}
+    }
     const started=await adapter.launch({executable:exe,root:selection.userDataDir,profile:selection.profileDirectory,port});
     opts={...opts,executable:exe,instance:String(started.pid)};launched=true;
     adapter.effects.browserStartedPid=started.pid;

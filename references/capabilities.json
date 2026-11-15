@@ -44,7 +44,7 @@
         "One matching PID",
         "Explicit profile-directory on running browser",
         "Loopback TCP CDP owned by that PID",
-        "CDP supports SystemInfo and Browser.getBrowserCommandLine"
+        "CDP supports SystemInfo and browser command line or Chrome version profile-path proof"
       ],
       "expectedResult": "Reused instance, verified endpoint and page target list; socket disconnected without browser.close",
       "failures": [
@@ -57,7 +57,7 @@
         "CDP_ERROR",
         "TIMEOUT"
       ],
-      "verification": "OS listener owner + CDP browser PID + CDP command-line root/profile + getVersion + getTargets",
+      "verification": "OS loopback listener/PID and explicit command-line root/profile; CDP browser PID plus command line, or native Chrome version-page profile path fallback (creates and closes a temporary verification tab)",
       "options": [
         "timeout",
         "user-data-dir",
@@ -105,7 +105,9 @@
         "INVALID_URL",
         "Connection failures",
         "GUI_NOT_OBSERVED",
-        "TIMEOUT"
+        "TIMEOUT",
+        "PORT_IN_USE",
+        "PORT_MISMATCH"
       ],
       "verification": "All connect checks + created target re-read + DOM location/readyState/body/title assertion + host window handle after operation",
       "options": [
@@ -117,7 +119,8 @@
         "browser",
         "executable",
         "url",
-        "expect-title"
+        "expect-title",
+        "port"
       ]
     },
     "verify": {
@@ -238,13 +241,36 @@
         "expect-title",
         "selector"
       ]
+    },
+    "copy-profile": {
+      "preconditions": [
+        "User authorized copying selected profile",
+        "Existing source root/exact profile directory",
+        "New absolute destination with existing parent; outside source"
+      ],
+      "expectedResult": "Best-effort selected-profile copy with file counts, omissions manifest and loginSession NOT_TESTED; source untouched",
+      "failures": [
+        "COPY_AUTHORIZATION_REQUIRED",
+        "DESTINATION_EXISTS",
+        "INVALID_DESTINATION",
+        "COPY_INCOMPLETE",
+        "TIMEOUT"
+      ],
+      "verification": "Re-read copied Local State and Preferences; manifest describes omissions; no claim of atomic consistency or preserved login",
+      "options": [
+        "timeout",
+        "user-data-dir",
+        "profile-directory",
+        "destination-root",
+        "copy-authorized"
+      ]
     }
   },
   "unsupported": {
-    "profileCreation": "No create/delete/copy/seed profile commands",
-    "sessionModification": "No logout, auth copying, browser close/restart or lock deletion",
+    "profileCreation": "No implicit profile creation, deletion or seeding; explicit authorized copy-profile only",
+    "sessionModification": "No logout, browser restart/close, lock deletion or cookie decryption; copying preserves source bytes when readable but cannot promise login",
     "pipeTakeover": "Reuse original client; this harness does not hijack remote-debugging-pipe",
-    "personalChromeWithoutCdp": "Chrome Stable/native and Chrome Beta are outside this skill; inventory may list them only to prevent profile/process collisions",
+    "personalChromeWithoutCdp": "Default personal Chrome root cannot be launched through port; use explicitly authorized copy to a separate root. No autoConnect/Allow bypass. Beta unsupported.",
     "arbitraryExecutable": "Unknown distributions are blocked rather than labeled Chrome/Chromium by guess",
     "generalAutomation": "No arbitrary JS eval or desktop control; bounded read/fill/click only",
     "visualConfirmation": "Window handle is not proof that user sees the interactive desktop",
@@ -261,7 +287,7 @@
     "mcpHost": {
       "server": "browse_open",
       "entrypoint": "scripts/mcp-server.mjs",
-      "commands": "doctor, profiles, connect, tabs, open, verify, read, fill, click; native_launch removed",
+      "commands": "doctor, profiles, connect, tabs, open, verify, read, fill, click, copy-profile",
       "antigravity": "Preferred when run_command is isolated and CIM is blocked",
       "verified": "Five fresh Antigravity CLI conversations on 2026-11-15"
     }
@@ -271,6 +297,11 @@
       "contract": "chromium.md",
       "entrypoint": "scripts/browse-open.mjs",
       "transport": "verified TCP CDP"
+    },
+    "chrome": {
+      "contract": "chrome-native.md",
+      "entrypoint": "scripts/browse-open.mjs",
+      "transport": "loopback TCP CDP; existing non-default root or authorized profile copy"
     }
   }
 }
