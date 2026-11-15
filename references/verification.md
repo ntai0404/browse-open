@@ -95,3 +95,29 @@ Bằng chứng gốc: `../artifacts/antigravity-cold-1794678773335/results.json`
 - PASS trong phạm vi launch: người dùng chọn profile native số 2 / `Profile 1`; native launcher gửi yêu cầu mở Chrome cài trên máy. Host ghi nhận ProductName Google Chrome, version 157.0.8103.78, PID 8648, handle 395254, title about:blank - Google Chrome, user-data-dir mặc định Chrome và profile-directory Profile 1 trong command line. Không thêm CDP flags và không gọi autoConnect.
 - BLOCKED phần control: CLI connect vào PID 8648 trả INSTANCE_NOT_CONNECTABLE, effects rỗng vì không có TCP CDP. Người dùng không chấp nhận thao tác hộp thoại; không thử cơ chế phát sinh prompt, không thay profile, không restart.
 - NOT_TESTED: DOM/URL qua CDP của tab native; input/click trên Chrome native; xác nhận desktop trực quan của lượt này; Antigravity end-to-end sau rename. Skill không tuyên bố hỗ trợ native control thành công trên môi trường này.
+
+
+## Antigravity: 10 lần mở Chrome native và dọn sau done — 2026-11-15
+
+PASS 10/10 trong phạm vi mở GUI native rồi cleanup. Mỗi lượt là một conversation mới với model `gemini-4-hydrogen-xhigh`, nhận đúng lời nhắn ban đầu “dùng skill [$browse-open](<đường-dẫn-SKILL.md>) để mở chrome GUI lên”, không nhúng sẵn URL hay profile vào prompt đầu. Khi agent hỏi, bộ điều phối trả lời lựa chọn người dùng đã chốt: Chrome native, Nguyễn Xuân / `Profile 1`. Cả mười lượt đều đọc SKILL.md rồi gọi MCP native_launch; không phải mười lần host tự gọi launcher thay agent.
+
+Root Chrome native thật và executable đã cài được dùng xuyên suốt. Không có Chrome/Chromium đang chạy tại bookend trước/sau đợt này. Trước từng lượt, runner chặn nếu root native còn instance. Sau agent result SUCCESS, cleanup đối chiếu PID mới, executable, root/profile arguments, host window title và cây accessibility chỉ có một TabItem tên about:blank; sau đó gọi CloseMainWindow bình thường và chờ PID thoát. Không force kill, không debugger/autoConnect, không hộp thoại cấp quyền, không xóa hay sao chép profile. Lượt sau chỉ chạy khi cleanup PASS; lượt cuối cũng đã đóng.
+
+| Lượt | Conversation | Native PID | GUI / cleanup |
+| --- | --- | --- | --- |
+| 1 | `46e1a74f-7e94-4928-b4bc-d558cb73e35f` | 11884 | PASS / PASS |
+| 2 | `6b9cc560-e525-491a-8b5c-567612346283` | 23096 | PASS / PASS |
+| 3 | `8b4b8036-6280-481f-842b-b73c1d6f386e` | 6804 | PASS / PASS |
+| 4 | `0cdfc27e-e25f-40df-932d-de2fa08f5cf0` | 17292 | PASS / PASS |
+| 5 | `cf3f0bba-8c90-4c7f-995a-d2c748f0dca4` | 23524 | PASS / PASS |
+| 6 | `6b99d54a-6da6-42b9-9a26-f3f399be93ca` | 22876 | PASS / PASS |
+| 7 | `79674238-7d40-4170-a277-1c40095abf97` | 26172 | PASS / PASS |
+| 8 | `eb6fb075-1e23-4a23-be76-c55d85988d64` | 25576 | PASS / PASS |
+| 9 | `0a326591-42b6-4d99-a9dc-c1c4cd78fa59` | 24184 | PASS / PASS |
+| 10 | `34480b01-de47-44fa-8941-e3b3c5f846dc` | 2228 | PASS / PASS |
+
+Có 8 lần agent tự kiểm tra connect và nhận BLOCKED / INSTANCE_NOT_CONNECTABLE vì không có TCP CDP; đây không phải lỗi mở GUI. Không có tool error ngoài các connect BLOCKED đó. DOM/CDP control vẫn NOT_TESTED trong đợt nghiệm thu này. Bằng chứng GUI là OS process/window và accessibility TabItem, không phải DOM target ID hay xác nhận thị giác của người dùng.
+
+Bằng chứng gốc local: `../artifacts/antigravity-native-1794758904403/acceptance.json`, `results.json`, bookend doctor, 10 file round-N.ndjson và 10 file round-N.cleanup.json. Raw logs/profile không được đưa vào repo hay ZIP. Các pilot và đợt bị gián đoạn trước đó được lưu riêng, không tính vào 10/10 này.
+
+Tái hiện: `node <skill-dir>/tests/antigravity-native.mjs 10`, chỉ khi được phép mở/đóng browser thử. Runner này dành cho môi trường dự án đã cấu hình Antigravity/MCP và lựa chọn native Profile 1; nó từ chối chạy nếu root native đang được dùng, rồi cleanup browser mới của từng lượt. Đây là hành vi test-only, không thêm lệnh close vào utility thông thường.

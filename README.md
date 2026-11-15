@@ -36,3 +36,8 @@ Run from an authorized Windows host with CIM access. Current result: 29/29 tests
 The opt-in live test needs CHROMIUM_OPEN_ROOT, CHROMIUM_OPEN_PROFILE and CHROMIUM_OPEN_EXE and preserves the browser. The Antigravity acceptance runners are project-specific tools requiring an existing secrets/chrome-chromium-profile and configured project/model. The cold runner closes the selected test browser, including a matching pre-existing instance. Do not run it without explicit authorization to close that browser. Earlier 10/10 cold-start tests supplied profile/URL; they do not prove autonomous handling of a minimal prompt.
 
 Raw artifacts, browser profiles and login sessions are excluded from the repository.
+
+
+Native GUI acceptance: 10/10 fresh Antigravity conversations opened the selected real Chrome profile and were followed by guarded cleanup after agent done. Every round used a new browser PID; the final browser was also closed. Profile choice was supplied in a follow-up when asked, while the initial prompt contained no profile or URL. GUI/tab evidence came from OS/window metadata and a read-only accessibility TabItem check. DOM/CDP control remains unverified. See verification history for evidence and limits.
+
+The native acceptance runner is `node tests/antigravity-native.mjs 10`; it requires the project-specific Antigravity/MCP setup and explicit permission to close test Chrome. It is configured for native Profile 1 and refuses to start while the native root is already in use. Its cleanup helpers are test-only; they close only an owned process showing exactly one disposable about:blank tab, then wait for process exit.
