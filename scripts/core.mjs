@@ -57,7 +57,7 @@ function ps(operation, payload, remaining) {
 }
 export function host(deadline) {
   const remaining=()=>{const ms=deadline-Date.now();requireThat(ms>0,'TIMEOUT','Operation deadline exceeded',4);return ms;};
-  return {remaining, inventory:()=>ps('inventory',null,remaining),launch:o=>ps('launch',o,remaining)};
+  return {remaining, inventory:()=>ps('inventory',null,remaining),launch:o=>ps('launch',o,remaining),nativeLaunch:o=>ps('nativeLaunch',o,remaining)};
 }
 export function normalizeInventory(raw) {
   const defaultChrome=process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data') : null;
@@ -71,7 +71,7 @@ export function kind(exe='') { return /[\\/]Google[\\/]Chrome[\\/]Application[\\
 export function binaries(inv, explicit) {
   const candidates=[explicit,...inv.processes.map(p=>p.executable),process.env.CHROMIUM_EXECUTABLE];
   for(const base of [process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean)) candidates.push(path.join(base,'Google/Chrome/Application/chrome.exe'));
-  try {const req=createRequire(path.join(process.cwd(),'__chromium_open__.cjs'));candidates.push(req('playwright-core').chromium.executablePath());}catch{}
+  try {const req=createRequire(path.join(process.cwd(),'__browse_open__.cjs'));candidates.push(req('playwright-core').chromium.executablePath());}catch{}
   return [...new Set(candidates.filter(Boolean).filter(p=>fs.existsSync(p)).map(p=>fs.realpathSync(p)))].map(executable=>({kind:kind(executable),executable}));
 }
 export async function httpJson(url, remaining, method='GET') {

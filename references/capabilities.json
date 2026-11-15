@@ -155,7 +155,7 @@
     "pipeTakeover": "Reuse original client; this harness does not hijack remote-debugging-pipe",
     "personalChromeWithoutCdp": "BLOCKED; never restart to enable debugging",
     "arbitraryExecutable": "Unknown distributions are blocked rather than labeled Chrome/Chromium by guess",
-    "generalAutomation": "No arbitrary JS eval, click, input, network capture or application test framework",
+    "generalAutomation": "No arbitrary JS eval or general automation framework; native DOM actions use an already authorized client and are not harness commands",
     "visualConfirmation": "Window handle is not proof that user sees the interactive desktop",
     "guestSystemProfiles": "Guest Profile and System Profile are excluded from selectable persistent profiles"
   },
@@ -168,11 +168,39 @@
   "transports": {
     "cli": "Implemented; requires authorized Windows host process/GUI/network context",
     "mcpHost": {
-      "server": "chromium_open",
+      "server": "browse_open",
       "entrypoint": "scripts/mcp-server.mjs",
-      "commands": "Same CLI operations and guards; no arbitrary shell/eval interface",
+      "commands": "Six TCP CLI operations plus native_launch dispatch-only tool; no arbitrary shell/eval",
       "antigravity": "Preferred when run_command is isolated and CIM is blocked",
       "verified": "Five fresh Antigravity CLI conversations on 2026-11-15"
+    }
+  },
+  "variants": {
+    "chromium": {
+      "contract": "chromium.md",
+      "entrypoint": "scripts/browse-open.mjs",
+      "transport": "verified TCP CDP"
+    },
+    "chromeNative": {
+      "contract": "chrome-native.md",
+      "entrypoint": "scripts/native-launch.mjs",
+      "mcpTool": "native_launch",
+      "preconditions": [
+        "Windows host",
+        "Existing selected native profile",
+        "Installed Google Chrome executable"
+      ],
+      "expectedResult": "Native launch request dispatched only; tab/control NOT_TESTED",
+      "failures": [
+        "PROFILE_NOT_FOUND",
+        "NATIVE_CHROME_REQUIRED",
+        "BROWSER_NOT_FOUND",
+        "BROWSER_MISMATCH",
+        "PROFILE_OCCUPANCY_UNKNOWN",
+        "TIMEOUT"
+      ],
+      "verification": "Launch dispatch is not tab/DOM/profile-activation proof. Control requires an existing authorized connection with profile evidence.",
+      "noDialogPolicy": "Never initiate autoConnect authorization or bypass a prompt; BLOCKED for control without an existing authorized connection"
     }
   }
 }

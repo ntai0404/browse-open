@@ -1,77 +1,32 @@
 ---
-name: chromium-open
-description: Opens and verifies Chrome or Chromium tabs on Windows through an executable CLI harness. Use to discover browsers, list and select profile directories, safely reuse a running CDP instance, launch an existing profile, or diagnose browser connection failures without losing login sessions.
+name: browse-open
+description: Opens Chromium or the user's installed native Chrome on Windows with an explicitly selected profile. Discovers existing sessions, reuses authorized browser connections, and verifies tabs while preserving login sessions. Use the Chromium harness or the native Chrome branch according to the requested browser.
 ---
 
-# Chromium Open
+# Browse Open
 
-Dùng CLI của skill để khảo sát, chọn đúng profile và mở tab. Không tự phát minh lệnh launch ngoài harness.
+Một skill, hai nhánh. Chọn đúng browser trước khi gọi tool có thể launch; không dùng profile automation thay cho Chrome native của người dùng.
 
-## Antigravity: chọn transport trước
+## Router bắt buộc
 
-Nếu client đã có MCP server `chromium_open`, dùng các tool cùng tên command của server đó (`doctor`, `profiles`, `open`, `verify`...) để gọi chính harness trên host. Trong Antigravity ưu tiên đường này; `run_command` có thể bị cô lập, chặn CIM/network dù tiến trình CLI bên ngoài chạy trên host. Không lặp lại `doctor` trong terminal khi nó đã trả `HOST_INSPECTION_FAILED`.
+1. Khảo sát tool browser/MCP, OS, executable, PID, root và khả năng kết nối bằng `node <skill-dir>/scripts/browse-open.mjs doctor` hoặc MCP `browse_open/doctor` trên host. Doctor không chứng minh browser điều khiển được.
+2. Người dùng nói Chromium hoặc Chrome for Testing: đọc [nhánh Chromium](references/chromium.md), dùng TCP harness có sẵn. Người dùng nói Chrome native, Chrome đang dùng, phiên đăng nhập cá nhân: đọc [nhánh Chrome native](references/chrome-native.md). Nếu chưa rõ và không có lựa chọn đang dùng trong task, hỏi loại browser; không tự chuyển loại.
+3. Liệt kê profile bằng `profiles --user-data-dir <root>`. Với native, mặc định khảo sát `%LOCALAPPDATA%/Google/Chrome/User Data`; xác minh executable là Chrome cài trên máy, không phải Playwright. Danh tính là executable + root + directory, displayName chỉ để đọc.
+4. Người dùng tự chọn profile native: đưa danh sách đánh số trước lần mở đầu tiên, kể cả khi chỉ có một profile; giữ nguyên lựa chọn cho các lần sau trong cùng task. Cho phép yêu cầu đổi. Nếu không có profile hợp lệ, báo BLOCKED, không tạo/copy profile. Chromium áp dụng bảng quyết định riêng trong nhánh của nó.
+5. Không có URL và chỉ yêu cầu mở GUI/tab: mở `about:blank`, không hỏi URL và không tự mở Google. Có URL task thì dùng đúng URL. Không tự chuyển sang trang trắng khi URL task lỗi.
 
-Tool arguments dùng camelCase: `userDataDir`, `profileDirectory`, `instance`, `endpoint`, `executable`, `browser`, `url`, `target`, `expectTitle`, `timeout`. Đọc schema tool do client công bố; không đoán file `instructions.md`. Kết quả vẫn là JSON của CLI, có thêm `transport.exitCode`. Không tính lời báo SUCCESS của agent là bằng chứng.
+## Giao diện
 
-Nếu server chưa có, đọc phần MCP trong [CLI reference](references/cli.md). Không bỏ guard profile/ownership để né sandbox. Agent có terminal host đã được cấp quyền vẫn gọi CLI trực tiếp theo contract dưới đây.
+- Chromium hoặc TCP đã cấp quyền: `scripts/browse-open.mjs`, [CLI](references/cli.md), MCP `browse_open`.
+- Mở Chrome native với profile đã chọn, không bật debugger: `scripts/native-launch.mjs`, theo [contract native](references/chrome-native.md). Đây là mở cửa sổ/tab; không phải bằng chứng điều khiển được.
+- Điều khiển native: chỉ qua kết nối browser đã cấp quyền và đã xác minh đúng profile. Tái sử dụng tool theo tab của client; không tự phát minh lệnh desktop. Không tự gọi autoConnect khi chưa biết kết nối đã được cấp quyền, vì nó có thể hiện hộp thoại.
 
-## Execution contract
+## Ràng buộc phiên
 
-Gọi `node <skill-dir>/scripts/chromium-open.mjs --help` trước nếu chưa biết giao diện. `<skill-dir>` là thư mục chứa file này, không phụ thuộc cwd. Harness dùng Node >=22 có WebSocket native và PowerShell trên Windows; không cần npm install. Chạy trên host có quyền process/GUI bằng cơ chế chính thức của agent.
+Không restart/tắt browser, xóa lock/profile, sao chép cookie, tự bật debugger, thay profile hoặc tự bấm hộp thoại cấp quyền. Người dùng hiện không chấp nhận thao tác hộp thoại: nếu không có kết nối được cấp quyền sẵn, báo `BLOCKED` cho phần điều khiển. Có thể mở native bằng launcher bình thường khi task yêu cầu mở, nhưng phải tách kết quả mở và kết quả điều khiển.
 
-Mỗi lệnh trả đúng một object JSON trên stdout, `schemaVersion: 1`, `status`, `command`, `data` hoặc `error`, và `effects`. Exit code phải khớp kết quả. Timeout mặc định 20.000 ms; `--timeout` chấp nhận 500..120.000 ms cho toàn thao tác.
+Không tuyên bố “Chrome native hoạt động” chỉ vì Chromium chạy được hoặc native có process/window handle. Cần kiểm tra executable, profile path, tab ID, URL/DOM và kết quả thao tác đọc lại. Thiếu một phần thì ghi FAIL/BLOCKED/NOT_TESTED đúng phạm vi. Không bắt buộc hỏi xác nhận trực quan sau mỗi lần mở.
 
-## Khảo sát và chọn
+## Cài đặt và kiểm chứng
 
-1. Chạy `doctor`; kiểm kê browser, executable, root và instance. Nếu người dùng yêu cầu Chromium, không dùng Chrome thay thế chỉ vì nó đang chạy. `doctor.roots` không quét mọi thư mục trên đĩa: kiểm tra thêm root được người dùng/cấu hình workspace chỉ định; không đoán bừa hoặc đọc cookie/password.
-2. Chạy `profiles` cho các root ứng viên. Danh tính lựa chọn là **browser/executable + user-data-dir + profileDirectory**, không phải displayName. Chỉ tính profile hợp lệ: `exists: true`, root có `Local State`, và `profile` được harness chấp nhận; metadata cũ không phải profile dùng được.
-3. Áp dụng bảng quyết định dưới đây trước `open`. Khi hỏi, giữ nguyên danh sách đã đánh số để hiểu câu trả lời như “cái thứ 2”. Chỉ hỏi thông tin còn thiếu; không hỏi lại lựa chọn đã rõ.
-4. Tái sử dụng instance đúng lựa chọn nếu TCP CDP được xác minh. Không đổi profile để né lỗi kết nối. Pipe thuộc client khác phải dùng client đó hoặc báo `BLOCKED`.
-
-| Trường hợp | Hành động của agent |
-| --- | --- |
-| Người dùng chỉ định/chuyển profile | Dùng đúng root/directory được chỉ định; yêu cầu mới ghi đè lựa chọn trước. Nếu chỉ nêu tên hiển thị và có trùng tên, hỏi để phân biệt. |
-| Đã chọn trong cuộc hội thoại/cấu hình workspace rõ ràng | Kiểm tra lại sự tồn tại và dùng tiếp; không hỏi lại chỉ vì có profile khác. Không tự lưu cấu hình lâu dài. |
-| Chưa chọn, chỉ có một profile hợp lệ đúng loại browser | Dùng profile đó và nêu root/directory trong kết quả. |
-| Chưa chọn, có nhiều profile hợp lệ | Hỏi một lần bằng danh sách đánh số: browser, root, directory, displayName và tình trạng kết nối. Không ưu tiên tùy tiện profile đầu tiên, profile tên Default hay instance đang chạy. Chọn một profile không phải chạy lần lượt mọi profile. |
-| Không tìm được profile hợp lệ | Báo `BLOCKED`: không có profile có thể dùng trong các root đã kiểm tra. Hỏi đường dẫn profile có sẵn nếu chưa được cung cấp. Harness **chưa hỗ trợ tạo profile**, kể cả khi người dùng đồng ý; nói rõ giới hạn đó, không tạo thư mục/Preferences giả và không lặp `open` vào đường dẫn thiếu. |
-| Profile đã chọn bị mất/không hợp lệ | Báo lỗi lựa chọn đó; hỏi root/directory đúng hoặc cho phép chọn lại. Không âm thầm chuyển sang profile khác. |
-| Profile đúng đang chạy nhưng không kết nối được | Khảo sát lại một lần; dùng kết nối chính thức khác nếu có. Nếu vẫn thiếu quyền/CDP, báo `BLOCKED`, giữ session; không đóng/restart hoặc đổi profile. |
-
-## Chọn trang cần mở
-
-- Người dùng chỉ yêu cầu “mở Chrome/Chromium GUI”, “mở tab” mà không nêu trang: **mở `about:blank`, không hỏi URL**. Có thể bỏ `url` khi gọi `open`; CLI và MCP cùng áp dụng mặc định này. Verify bằng URL `about:blank` và target ID nhận được.
-- Có URL rõ ràng trong yêu cầu/ngữ cảnh task đang tiếp tục: dùng URL đó. Không tái dùng URL của một task cũ không liên quan.
-- Có tên dịch vụ và một địa chỉ chính thức đã xác định rõ trong ngữ cảnh: dùng địa chỉ đó. Chỉ hỏi khi việc chọn trang còn mơ hồ và ảnh hưởng đến task, hoặc URL đã chỉ định không được hỗ trợ; không thay URL lỗi bằng trang trắng rồi báo task thành công.
-- Hỗ trợ HTTP(S) không có credentials và đúng `about:blank`. Không tự mở Google/example.com như trang mặc định. Các URL nội bộ khác (`chrome://`, `file:`, `data:`, `javascript:` và biến thể `about:`) chưa hỗ trợ.
-
-## Gọi thao tác
-
-```powershell
-node <skill-dir>/scripts/chromium-open.mjs doctor
-node <skill-dir>/scripts/chromium-open.mjs profiles --user-data-dir "<root>"
-node <skill-dir>/scripts/chromium-open.mjs connect --user-data-dir "<root>" --profile-directory "<directory>" --instance <pid>
-node <skill-dir>/scripts/chromium-open.mjs open --browser chromium --executable "<exe>" --user-data-dir "<root>" --profile-directory "<directory>" --url "https://example.com/"
-```
-
-`open` dùng lại instance trùng root khi có thể; chỉ launch nếu root chưa được browser nào sử dụng và executable đã chọn rõ. Không tự tạo profile. Bỏ `--executable` chỉ khi `doctor` có đúng một executable thuộc loại đã chọn. `--instance` và `--endpoint` giới hạn kết nối vào phiên đã có, không cho phép tự launch khi phiên đó mất.
-
-Sau `open`, giữ `endpoint`, PID và `page.targetId` từ JSON. Dùng `tabs` để xem tab. Gọi `verify` từ một CLI mới với cùng selection/PID/endpoint, `--target <id> --url <expected-url>` để chứng minh browser còn sống sau opener thoát. `--expect-title "<exact-title>"` thêm assertion cho trang kiểm thử. Redirect cần URL đích đã biết để verify; không tự chấp nhận mọi redirect là thành công.
-
-## Diễn giải kết quả
-
-- Exit `0`, `PASS`: các kiểm tra của thao tác đó đạt; không đồng nghĩa đã kiểm tra mọi capability.
-- Exit `2`, `FAIL`: sai CLI/URL/lựa chọn. Sửa tham số, không đổi profile để né lỗi.
-- Exit `3`, `BLOCKED`: thiếu browser/profile, sai instance, ownership chưa rõ hoặc transport không hỗ trợ. Giữ nguyên browser/session.
-- Exit `4`, `FAIL`: kết nối/CDP/timeout. Kiểm tra lại `doctor` và endpoint trước khi thử lại.
-- Exit `5`, `FAIL`: không xác minh được DOM/GUI hoặc lỗi nội bộ. Không báo thành công.
-
-Đọc `effects` cả khi thất bại: browser có thể đã được mở hoặc tab đã tạo trước timeout. Khảo sát lại trước khi retry để tránh mở trùng. Harness không tự đóng hoặc rollback phiên đó.
-
-`open`/`verify` chỉ PASS khi PID sở hữu CDP, profile arguments, DOM/target URL và host window handle cùng khớp. `connect`/`tabs` chỉ chứng minh kết nối, không yêu cầu GUI. Handle khác 0 không thay thế xác nhận nhìn thấy trên desktop; báo trạng thái đó là `NOT_TESTED` nếu chưa có bằng chứng quan sát trực tiếp. Không bắt buộc hỏi người dùng có nhìn thấy cửa sổ sau mỗi lần mở; chỉ hỏi khi task yêu cầu xác nhận trực quan hoặc cần chẩn đoán hiển thị.
-
-## Giới hạn bảo toàn session
-
-Không có lệnh đóng, restart, xóa lock, tạo/xóa/copy profile, logout hay ghi session. Không điều khiển toàn desktop. Không tự bật CDP bằng cách tắt browser đang chạy. Chrome mặc định, profile không rõ hoặc pipe thuộc client khác có thể phải báo BLOCKED; không chọn profile khác thay thế. Hoạt động browser bình thường có thể cập nhật history/cache trong profile đã chọn.
-
-Đọc [capability map](references/capabilities.json) để biết precondition, expected result, failure và verification từng lệnh. Đọc [CLI và giới hạn](references/cli.md) khi cần chọn endpoint, xử lý lỗi hoặc kiểm thử. [Bằng chứng](references/verification.md) phân biệt kiểm thử logic, live và phần chưa thử.
+Đọc [CLI và MCP](references/cli.md), [capability map](references/capabilities.json) khi cần schema/exit code. [Lịch sử kiểm chứng](references/verification.md) phân biệt runtime với mock; kết quả cũ có profile/URL sẵn không chứng minh chọn profile tự động.

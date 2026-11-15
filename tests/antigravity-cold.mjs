@@ -5,7 +5,7 @@ import http from 'node:http';
 import {fileURLToPath} from 'node:url';
 import {connect,normalizeInventory,host} from '../scripts/core.mjs';
 const skill=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const cli=path.join(skill,'scripts/chromium-open.mjs');
+const cli=path.join(skill,'scripts/browse-open.mjs');
 const run=Date.now(), dir=path.join(skill,'artifacts',`antigravity-cold-${run}`);
 fs.mkdirSync(dir,{recursive:true});console.log('EVIDENCE_DIR='+dir);
 const root=path.resolve('secrets/chrome-chromium-profile'), directory='Default';
@@ -50,7 +50,7 @@ try {
   console.log(`ROUND=${round} COLD_START_CONFIRMED no selected-profile browser`);
   const url=`http://127.0.0.1:${server.address().port}/round-${round}`;
   const title=`ChromiumSkillAnti-${run}-${round}`;
-  const prompt=`Sử dụng skill $chromium-open tại ${path.join(skill,'SKILL.md')} để mở tab Chromium GUI.\nNgữ cảnh kiểm thử đã chọn: dùng profile automation hiện có ${root}, profile-directory ${directory}; mở URL ${url}. Browser của profile này hiện chưa chạy. Hãy tự khởi chạy Chromium mới có GUI qua skill rồi mở tab. Không dùng phiên/profile khác. Không tạo profile hoặc thay đổi đăng nhập. Để browser mở khi trả kết quả; bộ điều phối sẽ đóng riêng browser thử này sau khi kiểm chứng để lượt kế tiếp bắt đầu từ trạng thái tắt. Tự đọc skill và gọi harness của nó để thực hiện. Trả lời tối đa 5 dòng gồm trạng thái, PID, targetId, URL và giới hạn nếu có. Không sửa source. Giữ browser sau khi trả kết quả.`;
+  const prompt=`Sử dụng skill $browse-open tại ${path.join(skill,'SKILL.md')} để mở tab Chromium GUI.\nNgữ cảnh kiểm thử đã chọn: dùng profile automation hiện có ${root}, profile-directory ${directory}; mở URL ${url}. Browser của profile này hiện chưa chạy. Hãy tự khởi chạy Chromium mới có GUI qua skill rồi mở tab. Không dùng phiên/profile khác. Không tạo profile hoặc thay đổi đăng nhập. Để browser mở khi trả kết quả; bộ điều phối sẽ đóng riêng browser thử này sau khi kiểm chứng để lượt kế tiếp bắt đầu từ trạng thái tắt. Tự đọc skill và gọi harness của nó để thực hiện. Trả lời tối đa 5 dòng gồm trạng thái, PID, targetId, URL và giới hạn nếu có. Không sửa source. Giữ browser sau khi trả kết quả.`;
   fs.writeFileSync(path.join(dir,`round-${round}.prompt.txt`),prompt);
   const child=spawn(path.join(process.env.USERPROFILE,'.gemini/bin/agy.exe'),['--project',path.basename(process.cwd()),'--model','gemini-4-hydrogen-xhigh','--settings',path.join(skill,'tests/antigravity.session.json'),'--input-format','stream-json','--output-format','stream-json'],{stdio:['pipe','pipe','pipe'],windowsHide:true});
   const log=fs.createWriteStream(path.join(dir,`round-${round}.ndjson`));
@@ -66,8 +66,8 @@ try {
     if(t&&s.state==='DONE'){
       const p=JSON.stringify(t.parameters||{});
       if(/read_file|view_file/.test(t.name)&&p.includes('chromium-open')&&p.includes('SKILL.md'))readSkill=true;
-      if(t.name==='run_command'&&p.includes('chromium-open.mjs')){calledHarness=true;if(/chromium-open\.mjs"?\s+open(?:\s|$)/.test(t.parameters.CommandLine||''))calledOpen=true;}
-      if(t.name==='call_mcp_tool'&&t.parameters?.ServerName==='chromium_open'){calledHarness=true;if(t.parameters.ToolName==='open'){calledOpen=true;try{openResult=JSON.parse(t.output);}catch{}}}
+      if(t.name==='run_command'&&p.includes('browse-open.mjs')){calledHarness=true;if(/chromium-open\.mjs"?\s+open(?:\s|$)/.test(t.parameters.CommandLine||''))calledOpen=true;}
+      if(t.name==='call_mcp_tool'&&t.parameters?.ServerName==='browse_open'){calledHarness=true;if(t.parameters.ToolName==='open'){calledOpen=true;try{openResult=JSON.parse(t.output);}catch{}}}
     }
     if(s?.state==='ERROR')toolErrors.push(t||s);
     if(e.event==='result'){result=e.result;clearTimeout(timer);resolve();}

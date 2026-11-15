@@ -86,3 +86,12 @@ Bằng chứng gốc: `../artifacts/antigravity-cold-1794678773335/results.json`
 - PASS: MCP `open` không truyền URL, dùng lại PID 25460 / root `secrets/chromium-gui-agent` / `Default`, tạo target `6957A9B608A9A36FF11162F7F1FB5866` với DOM URL `about:blank`, readyState complete. CLI verify ở process mới và HTTP `/json/list` độc lập đều xác nhận cùng target. Bằng chứng local: `artifacts/default-blank.json`.
 - NOT_TESTED: chạy lại Antigravity end-to-end với lời nhắn tối giản và từng nhánh hỏi/chọn profile sau sửa contract. Các batch 10/10 trước có sẵn profile/URL, không chứng minh các quyết định hội thoại mới này.
 - UNSUPPORTED: tạo profile mới; chưa có implementation, không phải một nhánh đã PASS.
+
+
+## Browse Open: hai nhánh — 2026-11-15
+
+- Skill đổi tên thành `browse-open`; giữ TCP harness và tách `references/chromium.md`, `references/chrome-native.md`. MCP utility đổi thành `browse_open`; server browser khác giữ nguyên.
+- PASS: 29/29 tests harness/MCP/native adapter trên host Windows. Các bài native success là mock OS boundary để kiểm tra routing/guard, không chứng minh browser runtime.
+- PASS trong phạm vi launch: người dùng chọn profile native số 2 / `Profile 1`; native launcher gửi yêu cầu mở Chrome cài trên máy. Host ghi nhận ProductName Google Chrome, version 157.0.8103.78, PID 8648, handle 395254, title about:blank - Google Chrome, user-data-dir mặc định Chrome và profile-directory Profile 1 trong command line. Không thêm CDP flags và không gọi autoConnect.
+- BLOCKED phần control: CLI connect vào PID 8648 trả INSTANCE_NOT_CONNECTABLE, effects rỗng vì không có TCP CDP. Người dùng không chấp nhận thao tác hộp thoại; không thử cơ chế phát sinh prompt, không thay profile, không restart.
+- NOT_TESTED: DOM/URL qua CDP của tab native; input/click trên Chrome native; xác nhận desktop trực quan của lượt này; Antigravity end-to-end sau rename. Skill không tuyên bố hỗ trợ native control thành công trên môi trường này.

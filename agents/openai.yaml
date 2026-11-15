@@ -1,4 +1,4 @@
 interface:
-  display_name: "Chromium Open"
-  short_description: "Open and verify the selected Chromium session"
-  default_prompt: "Use $chromium-open to discover browsers and profiles, reuse the selected session, and open a verified tab."
+  display_name: "Browse Open"
+  short_description: "Open Chromium or the selected native Chrome profile"
+  default_prompt: "Use $browse-open to discover browsers and profiles, reuse the selected session, and open a verified tab."

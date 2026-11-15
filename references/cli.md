@@ -55,20 +55,20 @@ Unit tests có synthetic profile metadata và mock tại boundary CDP cho kiểm
 
 ## MCP host transport cho Antigravity
 
-Server stdio `scripts/mcp-server.mjs` cung cấp đúng sáu command CLI dưới dạng tool, không nhận shell command và không mở rộng capability. Nó spawn cùng `chromium-open.mjs`, giữ mọi guard/profile/timeout và không giữ quyền sở hữu browser sau lệnh.
+Server stdio `scripts/mcp-server.mjs` cung cấp sáu command TCP CLI và tool native_launch riêng dưới dạng tool, không nhận shell command và không mở rộng capability. Nó spawn cùng `browse-open.mjs`, giữ mọi guard/profile/timeout và không giữ quyền sở hữu browser sau lệnh.
 
 Đăng ký một lần qua cơ chế MCP chính thức của client, từ môi trường host đã được phép:
 
 ```powershell
-agy mcp add chromium_open -- node "<absolute-skill-dir>/scripts/mcp-server.mjs"
+agy mcp add browse_open -- node "<absolute-skill-dir>/scripts/mcp-server.mjs"
 ```
 
-Khởi động cuộc hội thoại mới để nạp server. Khi chạy CLI không tương tác, file `tests/antigravity.session.json` cung cấp rule cho đúng sáu tool; có thể truyền `--settings <skill-dir>/tests/antigravity.session.json` nếu phạm vi task cho phép các thao tác đó. File không cấp quyền shell và không tắt sandbox. Cho phép các tool cụ thể theo phạm vi task; không dùng bỏ qua toàn bộ quyền. MCP server phải do client host khởi chạy với quyền quan sát process và localhost; cấu hình này không tự cấp quyền vượt chính sách máy. Nếu server cũng bị cô lập, báo BLOCKED thay vì tạo đường chuyển desktop hoặc service.
+Khởi động cuộc hội thoại mới để nạp server. Khi chạy CLI không tương tác, file `tests/antigravity.session.json` cung cấp rule cho các tool đã liệt kê; có thể truyền `--settings <skill-dir>/tests/antigravity.session.json` nếu phạm vi task cho phép các thao tác đó. File không cấp quyền shell và không tắt sandbox. Cho phép các tool cụ thể theo phạm vi task; không dùng bỏ qua toàn bộ quyền. MCP server phải do client host khởi chạy với quyền quan sát process và localhost; cấu hình này không tự cấp quyền vượt chính sách máy. Nếu server cũng bị cô lập, báo BLOCKED thay vì tạo đường chuyển desktop hoặc service.
 
 Ví dụ Antigravity wrapper sau khi đọc schema:
 
 ```json
-{"ServerName":"chromium_open","ToolName":"profiles","Arguments":{"userDataDir":"<existing-root>"}}
+{"ServerName":"browse_open","ToolName":"profiles","Arguments":{"userDataDir":"<existing-root>"}}
 ```
 
 Với `open`, truyền root/profile đã chọn, URL tùy chọn (mặc định `about:blank`), browser/executable và optional instance/endpoint theo cùng contract CLI. MCP chỉ đổi transport; bản thân `run_command` không trở nên có quyền CIM nhờ việc cài skill.
@@ -78,3 +78,10 @@ Với `open`, truyền root/profile đã chọn, URL tùy chọn (mặc định 
 `node <skill-dir>/tests/antigravity-cold.mjs 10` là bài nghiệm thu dự án, dùng profile automation đã tồn tại `secrets/chrome-chromium-profile` / `Default` trong workspace hiện tại. Nó cần Antigravity CLI, project tương ứng và MCP server đã đăng ký. Không chạy lệnh này trên profile có công việc cần giữ mở: runner sẽ đóng tab và toàn browser của đúng profile thử sau mỗi lượt, theo chấp thuận riêng cho bài test. Nó xác minh profile/PID/port trước khi đóng và dừng nếu cleanup không thành công. Không tạo profile mới và không thay thế bằng profile khác.
 
 Để tái hiện trên môi trường khác, phải chọn lại profile test có sẵn được phép đóng và cấu hình project/model cho môi trường đó. Đây không phải lệnh cleanup mặc định của skill.
+
+
+## Hai nhánh của browse-open
+
+`SKILL.md` là router. [Chromium](chromium.md) dùng TCP CLI; [Chrome native](chrome-native.md) dùng native launcher và chỉ điều khiển qua kết nối được cấp quyền sẵn. MCP có thêm `native_launch`; tool này chỉ gửi yêu cầu mở profile native, không đảm bảo DOM/target và không tự bật debugger. Chạy `node <skill-dir>/scripts/native-launch.mjs --help` để xem interface.
+
+Sau nâng cấp từ chromium-open: đổi thư mục cài thành browse-open, cập nhật tên skill invocation `$browse-open` và đăng ký lại `browse_open` với đường dẫn mới. Không giữ server utility cũ trỏ đến thư mục đã đổi tên. Client đang chạy có thể cần phiên mới để tải schema mới. Không sửa/xóa server browser khác khi di chuyển entry utility.

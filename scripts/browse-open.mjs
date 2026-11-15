@@ -7,7 +7,7 @@ let emitted=false, effects={}, timer;
 function emit(value,exit){if(emitted)return;emitted=true;clearTimeout(timer);process.stdout.write(JSON.stringify({schemaVersion:1,...value,effects})+'\n',()=>process.exit(exit));}
 try {
   const args=process.argv.slice(2),command=args.shift();
-  if(command==='--help'||command==='help')emit({status:'PASS',command:'help',commands,options,commandOptions:Object.fromEntries(commands.map(k=>[k,map.commands[k].options])),usage:'node chromium-open.mjs <command> --user-data-dir ROOT --profile-directory DIRECTORY [--browser chrome|chromium] [--url URL] [--timeout 20000]',exitCodes:{0:'PASS',2:'invalid arguments',3:'BLOCKED precondition',4:'connection/timeout',5:'verification FAIL'},unsupported:['profile creation','browser close/restart','pipe takeover','non-Windows mutation']},0);
+  if(command==='--help'||command==='help')emit({status:'PASS',command:'help',commands,options,commandOptions:Object.fromEntries(commands.map(k=>[k,map.commands[k].options])),usage:'node browse-open.mjs <command> --user-data-dir ROOT --profile-directory DIRECTORY [--browser chrome|chromium] [--url URL] [--timeout 20000]',exitCodes:{0:'PASS',2:'invalid arguments',3:'BLOCKED precondition',4:'connection/timeout',5:'verification FAIL'},unsupported:['profile creation','browser close/restart','pipe takeover','non-Windows mutation']},0);
   else {
     if(!commands.includes(command))throw new Failure('INVALID_COMMAND','Use --help',2);
     const opts={};for(let i=0;i<args.length;i+=2){const k=args[i].replace(/^--/,'');if(!args[i].startsWith('--')||!options.includes(k)||args[i+1]===undefined||opts[k]!==undefined)throw new Failure('INVALID_ARGUMENT','Use named option/value pairs from --help',2);opts[k]=args[i+1];}

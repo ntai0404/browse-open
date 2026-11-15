@@ -1,8 +1,18 @@
 [CmdletBinding()]
-param([ValidateSet('inventory','launch')][string]$Operation = 'inventory', [string]$Payload = '')
+param([ValidateSet('inventory','launch','nativeLaunch')][string]$Operation = 'inventory', [string]$Payload = '')
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 try {
+  if ($Operation -eq 'nativeLaunch') {
+    $o = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload)) | ConvertFrom-Json
+    $version = (Get-Item -LiteralPath $o.executable).VersionInfo
+    if ($version.ProductName -ne 'Google Chrome') { throw 'Selected executable is not installed Google Chrome' }
+    # Existing native profile only; do not enable debugging or alter auth settings.
+    $a = @(('--user-data-dir="' + $o.root + '"'), ('--profile-directory="' + $o.profile + '"'), '--new-tab', ('"' + $o.url + '"'))
+    $p = Start-Process -FilePath $o.executable -ArgumentList $a -WindowStyle Normal -PassThru
+    @{requestPid=$p.Id; dispatched=$true} | ConvertTo-Json -Compress
+    exit 0
+  }
   if ($Operation -eq 'launch') {
     $o = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload)) | ConvertFrom-Json
     $a = @('--remote-debugging-address=127.0.0.1', ('--remote-debugging-port=' + $o.port),

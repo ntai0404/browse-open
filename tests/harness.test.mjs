@@ -6,7 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {Failure,flag,profile,profiles,endpoint,perform,connect,normalizeInventory,httpJson,openUrl} from '../scripts/core.mjs';
-const cli=fileURLToPath(new URL('../scripts/chromium-open.mjs',import.meta.url));
+const cli=fileURLToPath(new URL('../scripts/browse-open.mjs',import.meta.url));
 function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'chromium-open-unit-'));
   fs.mkdirSync(path.join(root,'Profile 1'));fs.writeFileSync(path.join(root,'Profile 1','Preferences'),'{}');

@@ -3,9 +3,10 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import readline from 'node:readline';
 import map from '../references/capabilities.json' with {type:'json'};
-const cli=fileURLToPath(new URL('./chromium-open.mjs',import.meta.url));
+const cli=fileURLToPath(new URL('./browse-open.mjs',import.meta.url));
 const fields={timeout:'timeout',browser:'browser',executable:'executable',userDataDir:'user-data-dir',profileDirectory:'profile-directory',instance:'instance',endpoint:'endpoint',url:'url',target:'target',expectTitle:'expect-title'};
 export const tools=Object.entries(map.commands).map(([name,cap])=>({name,description:cap.expectedResult,inputSchema:{type:'object',properties:Object.fromEntries(Object.entries(fields).filter(([,option])=>cap.options.includes(option)).map(([field])=>[field,field==='timeout'?{type:'integer',minimum:500,maximum:120000}:field==='instance'?{type:'integer',minimum:1}:{type:'string',minLength:1}])),required:name==='doctor'?[]:name==='profiles'?['userDataDir']:['userDataDir','profileDirectory',...(name==='verify'?['target','url']:[])],additionalProperties:false},annotations:{readOnlyHint:name!=='open',destructiveHint:false,openWorldHint:name==='open'}}));
+tools.push({name:'native_launch',description:'Dispatch a normal launch request to the selected existing native Chrome profile. Does not enable debugging; tab/control verification remains NOT_TESTED.',inputSchema:{type:'object',properties:{executable:{type:'string',minLength:1},userDataDir:{type:'string',minLength:1},profileDirectory:{type:'string',minLength:1},url:{type:'string',minLength:1},timeout:{type:'integer',minimum:500,maximum:120000}},required:['executable','userDataDir','profileDirectory'],additionalProperties:false},annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:true}});
 export async function invoke(name,args={}) {
   const tool=tools.find(t=>t.name===name);
   if(!tool)throw Error('Unknown tool');
@@ -17,7 +18,7 @@ export async function invoke(name,args={}) {
     if(schema.type==='string'&&(typeof args[key]!=='string'||!args[key].length))throw Error('Invalid string: '+key);
   }
   for(const key of tool.inputSchema.required)if(args[key]===undefined)throw Error('Missing argument: '+key);
-  const argv=[cli,name,...Object.entries(args).flatMap(([key,value])=>['--'+fields[key],String(value)])];
+  const argv=[...(name==='native_launch'?[fileURLToPath(new URL('./native-launch.mjs',import.meta.url))]:[cli,name]),...Object.entries(args).flatMap(([key,value])=>['--'+fields[key],String(value)])];
   return await new Promise((resolve,reject)=>{
     const child=spawn(process.execPath,argv,{stdio:['ignore','pipe','pipe'],windowsHide:true});let out='',err='';
     const timer=setTimeout(()=>{child.kill();reject(Error('Harness process deadline exceeded; inspect browser state before retry'));},(args.timeout||20000)+5000);
@@ -30,7 +31,7 @@ export async function dispatch(request) {
   if(request.id===undefined)return;
   let result;
   try {
-    if(request.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'chromium-open',version:'1.0.0'}};
+    if(request.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'chromium-open',version:'1.1.0'}};
     else if(request.method==='ping')result={};
     else if(request.method==='tools/list')result={tools};
     else if(request.method==='tools/call') {const value=await invoke(request.params?.name,request.params?.arguments);result={content:[{type:'text',text:JSON.stringify(value)}],structuredContent:value,isError:value.status!=='PASS'};}

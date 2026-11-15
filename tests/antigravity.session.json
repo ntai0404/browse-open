@@ -2,12 +2,13 @@
   "toolPermission": "request-review",
   "permissions": {
     "allow": [
-      "mcp(chromium_open/doctor)",
-      "mcp(chromium_open/profiles)",
-      "mcp(chromium_open/connect)",
-      "mcp(chromium_open/tabs)",
-      "mcp(chromium_open/open)",
-      "mcp(chromium_open/verify)"
+      "mcp(browse_open/doctor)",
+      "mcp(browse_open/profiles)",
+      "mcp(browse_open/connect)",
+      "mcp(browse_open/tabs)",
+      "mcp(browse_open/open)",
+      "mcp(browse_open/verify)",
+      "mcp(browse_open/native_launch)"
     ]
   }
 }

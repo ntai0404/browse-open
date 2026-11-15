@@ -4,7 +4,7 @@ import http from 'node:http';
 import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
-const cli=fileURLToPath(new URL('../scripts/chromium-open.mjs',import.meta.url));
+const cli=fileURLToPath(new URL('../scripts/browse-open.mjs',import.meta.url));
 const root=process.env.CHROMIUM_OPEN_ROOT;
 const executable=process.env.CHROMIUM_OPEN_EXE;
 function run(args) {return new Promise((resolve,reject)=>{
