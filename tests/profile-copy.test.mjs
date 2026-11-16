@@ -10,7 +10,7 @@ function fixture(t) {
  const root=path.join(base,'source');fs.mkdirSync(path.join(root,'Profile 1'),{recursive:true});
  fs.writeFileSync(path.join(root,'Local State'),JSON.stringify({profile:{info_cache:{'Profile 1':{name:'Selected user'}}}}));
  fs.writeFileSync(path.join(root,'Profile 1','Preferences'),'{}');
- return {base,root,opts:{'user-data-dir':root,'profile-directory':'Profile 1','destination-root':path.join(base,'copy'),'copy-authorized':'yes'}};
+ return {base,root,opts:{'user-data-dir':root,'profile-directory':'Profile 1','destination-root':path.join(base,'Selected user-agis'),'copy-authorized':'yes'}};
 }
 test('authorized copy preserves selected data and reports omitted cache without touching source',async t=>{
  const {root,opts}=fixture(t);fs.mkdirSync(path.join(root,'Profile 1','Cache'));fs.writeFileSync(path.join(root,'Profile 1','Cache','sample'),'cache');
@@ -27,11 +27,17 @@ test('copy rejects missing authorization, existing destinations and destination 
  const {root,opts}=fixture(t);
  await assert.rejects(copyProfile({...opts,'copy-authorized':'no'},()=>1000,{}),e=>e.code==='COPY_AUTHORIZATION_REQUIRED');
  await assert.rejects(copyProfile({...opts,'destination-root':root},()=>1000,{}),e=>e.code==='DESTINATION_EXISTS');
- await assert.rejects(copyProfile({...opts,'destination-root':path.join(root,'nested')},()=>1000,{}),e=>e.code==='INVALID_DESTINATION');
+ await assert.rejects(copyProfile({...opts,'destination-root':path.join(root,'nested')},()=>1000,{}),e=>['INVALID_DESTINATION','AGIS_DESTINATION_REQUIRED'].includes(e.code));
  assert.equal(fs.existsSync(opts['destination-root']),false);
 });
 test('copy missing selected profile does not create destination',async t=>{
  const {opts}=fixture(t);
  await assert.rejects(copyProfile({...opts,'profile-directory':'Missing'},()=>1000,{}),e=>e.code==='PROFILE_NOT_FOUND');
  assert.equal(fs.existsSync(opts['destination-root']),false);
+});
+
+test('wrong copy root is blocked with exact agis destination before copying',async t=>{
+ const {base,opts}=fixture(t);const destination=path.join(base,'BrowseOpenData');
+ await assert.rejects(copyProfile({...opts,'destination-root':destination},()=>1000,{}),e=>e.code==='AGIS_DESTINATION_REQUIRED'&&e.details.expectedDestination===opts['destination-root']);
+ assert.equal(fs.existsSync(destination),false);
 });

@@ -7,7 +7,8 @@ try {
     $o = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload)) | ConvertFrom-Json
     $a = @('--remote-debugging-address=127.0.0.1', ('--remote-debugging-port=' + $o.port),
       ('--user-data-dir="' + $o.root + '"'), ('--profile-directory="' + $o.profile + '"'),
-      '--enable-automation', '--no-first-run', '--no-default-browser-check', 'about:blank')
+      '--no-first-run', '--no-default-browser-check', 'about:blank')
+    if ($o.browser -eq 'chromium') { $a += '--enable-automation' }
     $p = Start-Process -FilePath $o.executable -ArgumentList $a -WindowStyle Normal -PassThru
     @{pid=$p.Id} | ConvertTo-Json -Compress
     exit 0

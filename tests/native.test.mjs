@@ -8,7 +8,7 @@ import {perform,connect,normalizeInventory} from '../scripts/core.mjs';
 function fixture(t){
  const base=fs.mkdtempSync(path.join(os.tmpdir(),'browse-native-port-'));
  t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
- const root=path.join(base,'selected');fs.mkdirSync(path.join(root,'Profile 1'),{recursive:true});
+ const root=path.join(base,'selected-agis');fs.mkdirSync(path.join(root,'Profile 1'),{recursive:true});
  fs.writeFileSync(path.join(root,'Local State'),'{}');fs.writeFileSync(path.join(root,'Profile 1','Preferences'),'{}');
  const executable=path.join(base,'Google','Chrome','Application','chrome.exe');fs.mkdirSync(path.dirname(executable),{recursive:true});fs.writeFileSync(executable,'test fixture; never executed');
  return {root,executable};
@@ -24,4 +24,9 @@ test('native launch requested occupied port preserves owner and never launches',
  let launched=false;
  await assert.rejects(perform('open',{browser:'chrome',executable,'user-data-dir':root,'profile-directory':'Profile 1',port:String(server.address().port)},{inventory:async()=>({processes:[],listeners:[]}),effects:{},launch:()=>{launched=true;}},Date.now()+5000),e=>e.code==='PORT_IN_USE');
  assert.equal(launched,false);assert.equal(server.listening,true);
+});
+
+test('native original root is blocked before attach or launch',async t=>{
+ const {root}=fixture(t);const ordinary=path.join(path.dirname(root),'BrowseOpenData');fs.renameSync(root,ordinary);
+ await assert.rejects(perform('open',{browser:'chrome','user-data-dir':ordinary,'profile-directory':'Profile 1'},{inventory:async()=>({processes:[],listeners:[]}),effects:{}},Date.now()+5000),e=>e.code==='AGIS_PROFILE_REQUIRED');
 });

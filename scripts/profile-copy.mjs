@@ -12,6 +12,10 @@ export async function copyProfile(opts,remaining,effects) {
   requireThat(fs.existsSync(path.dirname(destination))&&fs.statSync(path.dirname(destination)).isDirectory(),'DESTINATION_PARENT_MISSING','Destination parent must be an existing directory');
   const parent=fs.realpathSync(path.dirname(destination));
   const dest=path.join(parent,path.basename(destination));
+  const state=JSON.parse(fs.readFileSync(path.join(selection.userDataDir,'Local State'),'utf8'));
+  const name=(state.profile?.info_cache?.[selection.profileDirectory]?.name||selection.profileDirectory).replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/[. ]+$/g,'');
+  const expected=path.join(path.dirname(selection.userDataDir),name+'-agis');
+  requireThat(dest.toLowerCase()===expected.toLowerCase(),'AGIS_DESTINATION_REQUIRED','Copy destination must be the selected display-name-agis root beside source User Data',3,{expectedDestination:expected});
   const relative=path.relative(selection.userDataDir,dest);
   requireThat(relative.startsWith('..'+path.sep)||path.isAbsolute(relative),'INVALID_DESTINATION','Destination cannot be inside the source root',2);
   fs.mkdirSync(dest);effects.profileCopyRoot=dest;

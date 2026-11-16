@@ -113,6 +113,7 @@ export async function connect(inv,selection,opts,remaining) {
   const rows=matching(inv,selection).filter(p=>!opts.instance || p.pid===Number(opts.instance));
   requireThat(rows.length===1,'INSTANCE_NOT_FOUND','Select one running instance for this user-data directory',3);
   const instance=rows[0];
+  if(instance.kind==='chrome')requireThat(path.basename(selection.userDataDir).endsWith('-agis'),'AGIS_PROFILE_REQUIRED','Native Chrome requires a selected -agis root; discover existing copies or ask for the source profile first');
   requireThat(instance.inspectable,'INSTANCE_UNINSPECTABLE','Cannot inspect browser command line');
   requireThat(!opts.executable || same(instance.executable,opts.executable),'BROWSER_MISMATCH','Executable differs from the selected instance');
   requireThat(!opts.browser || instance.kind===opts.browser,'BROWSER_MISMATCH','Chrome/Chromium kind differs from selected instance');
@@ -193,6 +194,7 @@ export async function perform(command,opts,adapter,deadline) {
   let inv=normalizeInventory(await adapter.inventory());
   if(command==='doctor')return {agisProfiles:discoverAgis([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir),path.join(process.cwd(),'secrets','placeholder')]),os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
   const selection=profile(opts['user-data-dir'],opts['profile-directory']);
+  if(opts.browser==='chrome')requireThat(path.basename(selection.userDataDir).endsWith('-agis'),'AGIS_PROFILE_REQUIRED','Do not open the original Chrome profile or BrowseOpenData. Call doctor: reuse a valid agisProfiles selection, or ask the user to choose a source profile and copy to its sibling <display-name>-agis root. Do not offer Chromium/manual launch alternatives.');
   if(opts.browser)requireThat(['chromium','chrome'].includes(opts.browser),'INVALID_BROWSER','Use chromium or chrome; Beta is unsupported',2);
   if(opts.executable)requireThat(fs.existsSync(opts.executable),'BROWSER_NOT_FOUND','Selected executable does not exist');
   let existing=matching(inv,selection), launched=false;
@@ -203,6 +205,7 @@ export async function perform(command,opts,adapter,deadline) {
     requireThat(choices.length===1,'BROWSER_AMBIGUOUS','Several executables match; pass --executable');
     const exe=choices[0].executable;
     requireThat(['chromium','chrome'].includes(choices[0].kind),'BROWSER_UNSUPPORTED','Executable is not discovered Chromium or Chrome native');
+    if(choices[0].kind==='chrome')requireThat(path.basename(selection.userDataDir).endsWith('-agis'),'AGIS_PROFILE_REQUIRED','Native Chrome requires a selected -agis root; never launch BrowseOpenData or the original personal root');
     requireThat(!inv.processes.some(p=>!p.inspectable || (!p.userDataDir && same(p.executable,exe))),'PROFILE_OCCUPANCY_UNKNOWN','A running browser has unknown profile ownership; cannot safely launch');
     const protectedRoots=process.env.LOCALAPPDATA?['Google/Chrome/User Data','Google/Chrome Beta/User Data','Chromium/User Data'].map(p=>path.join(process.env.LOCALAPPDATA,p)):[];
     requireThat(!protectedRoots.some(root=>same(selection.userDataDir,root)),'DEFAULT_PROFILE_CDP_UNSUPPORTED','Use an explicitly selected existing automation root; do not enable CDP on a default personal root');
@@ -211,7 +214,7 @@ export async function perform(command,opts,adapter,deadline) {
       try {await new Promise((resolve,reject)=>{const server=net.createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolve));});}
       catch {throw new Failure('PORT_IN_USE','Requested loopback port is unavailable; ask the user to enter another port; never auto-select or stop its owner');}
     }
-    const started=await adapter.launch({executable:exe,root:selection.userDataDir,profile:selection.profileDirectory,port});
+    const started=await adapter.launch({browser:choices[0].kind,executable:exe,root:selection.userDataDir,profile:selection.profileDirectory,port});
     opts={...opts,executable:exe,instance:String(started.pid)};launched=true;
     adapter.effects.browserStartedPid=started.pid;
     while(true){

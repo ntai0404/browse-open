@@ -35,3 +35,7 @@ The -agis setup copies only the profile explicitly selected by the user, under t
 Copy PASS means required metadata exists in the destination, not that all files or login sessions survived. Read omissions, complete, consistency and loginSession. A live source may have locked cookie/session files. A copied profile is independent and does not sync back to the original. Report copy, GUI/CDP/DOM and authentication results separately.
 
 Use PASS/FAIL/BLOCKED/NOT_TESTED according to evidence. A local DOM test does not prove Facebook, Google Docs or all sites. User visual confirmation remains NOT_TESTED without observation; do not require a repeated confirmation question after each successful open. See [verification evidence](references/verification.md).
+
+## Native launch behavior
+
+The launcher omits --enable-automation for native Chrome (Chromium may retain it). Native profile verification uses the version-page fallback when needed. Do not tell the user to edit source or launch Chrome manually: call the harness. On AGIS_PROFILE_REQUIRED discover copies/select source; on AGIS_DESTINATION_REQUIRED use expectedDestination for the selected source. Do not offer unrelated Chromium/manual-CDP alternatives. Missing URL means open about:blank and finish; do not ask what URL to open next unless the task requires one.
