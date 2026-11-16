@@ -138,3 +138,8 @@ PASS: 26/26 boundary/CLI/MCP tests. PASS runtime qua MCP host: Chromium PID 1539
 - PASS: skill-creator quick_validate.
 - PARTIAL COPY: earlier authorized copy copied 8520 files, 18 locked-file omissions including Cookies/session. Source browser left running. New copy-profile implementation additionally skips known caches and writes an omissions manifest. Full real-profile copy using the new command NOT_TESTED; filesystem tests exercise its actual copy behavior.
 - NOT_TESTED: authentication preservation, new-process native launch via updated CLI (live test reused existing process), new Antigravity end-to-end batch, every external website. Historical native GUI counts do not establish this branch's DOM reliability across ten trials.
+
+
+## Fast-path forward test, 2026-11-16
+
+39 automated tests PASS. Fresh Antigravity conversation cc13f6d8-53f1-459c-a191-5a71f00caf5f using gemini-4-hydrogen-xhigh: read SKILL.md, read MCP doctor schema, called doctor once, then returned numbered real source profiles and asked for selection. No source-code reads, original-root open, alternative workflows, URL question or implicit profile selection. Agent turn SUCCESS, 64.33 seconds (model latency included). Full selected-copy/new-launch/DOM sequence under this revised fast path remains NOT_TESTED; this run intentionally stops at required user choice. Raw evidence artifacts/agis-fastpath-result.json is local-only.

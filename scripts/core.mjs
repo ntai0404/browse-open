@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {nativePlan,sourceChoice} from './plan.mjs';
 import {discoverAgis} from './agis.mjs';
 import {domAction} from './dom.mjs';
 import {copyProfile} from './profile-copy.mjs';
@@ -192,7 +193,11 @@ export async function perform(command,opts,adapter,deadline) {
   if(opts.port!==undefined)requireThat(/^[0-9]+$/.test(opts.port)&&Number(opts.port)>=1024&&Number(opts.port)<=65535,'INVALID_PORT','port must be 1024..65535',2);
   if(command==='profiles')return {profiles:profiles(opts['user-data-dir'])};
   let inv=normalizeInventory(await adapter.inventory());
-  if(command==='doctor')return {agisProfiles:discoverAgis([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir),path.join(process.cwd(),'secrets','placeholder')]),os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
+  if(command==='doctor') {
+    const data={agisProfiles:discoverAgis([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir),path.join(process.cwd(),'secrets','placeholder')]),os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
+    const sourceProfiles=data.roots.filter(root=>!path.basename(root).endsWith('-agis')&&/[\\/]Google[\\/]Chrome[\\/]User Data$/i.test(root)).flatMap(root=>{try{return profiles(root).filter(p=>p.exists).map(sourceChoice);}catch{return [];}});
+    return {...data,sourceProfiles,nextAction:nativePlan(inv,data.agisProfiles,sourceProfiles)};
+  }
   const selection=profile(opts['user-data-dir'],opts['profile-directory']);
   if(opts.browser==='chrome')requireThat(path.basename(selection.userDataDir).endsWith('-agis'),'AGIS_PROFILE_REQUIRED','Do not open the original Chrome profile or BrowseOpenData. Call doctor: reuse a valid agisProfiles selection, or ask the user to choose a source profile and copy to its sibling <display-name>-agis root. Do not offer Chromium/manual launch alternatives.');
   if(opts.browser)requireThat(['chromium','chrome'].includes(opts.browser),'INVALID_BROWSER','Use chromium or chrome; Beta is unsupported',2);
