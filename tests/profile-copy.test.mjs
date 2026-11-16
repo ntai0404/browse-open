@@ -41,3 +41,11 @@ test('wrong copy root is blocked with exact agis destination before copying',asy
  await assert.rejects(copyProfile({...opts,'destination-root':destination},()=>1000,{}),e=>e.code==='AGIS_DESTINATION_REQUIRED'&&e.details.expectedDestination===opts['destination-root']);
  assert.equal(fs.existsSync(destination),false);
 });
+
+test('large omission lists stay in manifest while response remains bounded',async t=>{
+ const {root,opts}=fixture(t);
+ for(let n=0;n<20;n++){const sub=path.join(root,'Profile 1','folder-'+n,'Cache');fs.mkdirSync(sub,{recursive:true});fs.writeFileSync(path.join(sub,'entry'),'ignored');}
+ const r=await copyProfile(opts,()=>10000,{});
+ assert.equal(r.omissionCount,20);assert.equal(r.omissions.length,12);assert.equal(r.omissionsTruncated,true);
+ assert.equal(JSON.parse(fs.readFileSync(r.manifestPath)).omissions.length,20);
+});

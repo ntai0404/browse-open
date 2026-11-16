@@ -143,3 +143,16 @@ PASS: 26/26 boundary/CLI/MCP tests. PASS runtime qua MCP host: Chromium PID 1539
 ## Fast-path forward test, 2026-11-16
 
 39 automated tests PASS. Fresh Antigravity conversation cc13f6d8-53f1-459c-a191-5a71f00caf5f using gemini-4-hydrogen-xhigh: read SKILL.md, read MCP doctor schema, called doctor once, then returned numbered real source profiles and asked for selection. No source-code reads, original-root open, alternative workflows, URL question or implicit profile selection. Agent turn SUCCESS, 64.33 seconds (model latency included). Full selected-copy/new-launch/DOM sequence under this revised fast path remains NOT_TESTED; this run intentionally stops at required user choice. Raw evidence artifacts/agis-fastpath-result.json is local-only.
+
+
+## Accepted cold native launch batch, 2026-11-16
+
+PASS: 10/10 fresh Antigravity CLI conversations (gemini-4-hydrogen-xhigh), 10 distinct native Chrome browser PIDs. Every agent read SKILL.md and used harness open/fill/click/read; every successful open reported reused=false. Each round verified the exact unique input/output value, one click and one matching independent HTTP callback. Root/profile/OS listener/CDP PID/DOM/GUI were verified by harness.
+
+PASS: full authorized test-browser shutdown after each round. Browser.close was sent only after matching exact selected -agis root/profile/PID/endpoint; then OS inventory showed zero matching root processes and endpoint stopped responding. Original personal Chrome PID 15956 remained alive through all ten cleanups. PIDs: 27240, 27248, 13540, 19108, 8552, 7320, 25296, 26500, 23088, 5996.
+
+PASS: actual launch metadata confirmed installed Google Chrome, -agis root, port 4444, no enable-automation. 40 automated tests passed. Copy command output was bounded to 12 omission examples while keeping full manifest.
+
+Evidence retained locally: artifacts/antigravity-native-dom-1794817624154/{summary.json,results.json,round-*.ndjson,native-launch-flags.json}. Raw data is excluded from release. Earlier tab-only batch was not accepted: it left the browser running and stopped on baseline loss at case 5. A separate copy/setup run created the selected -agis root but required recovery; do not count it as an uninterrupted acceptance run.
+
+Scope: cold native launch plus DOM on the controlled local page using the existing selected -agis profile. Login/session preservation, all external sites and other devices remain NOT_TESTED. The ten results establish this tested environment, not a universal 100-percent guarantee.

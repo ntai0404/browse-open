@@ -42,5 +42,5 @@ export async function copyProfile(opts,remaining,effects) {
   const data={source:selection,userDataDir:dest,profileDirectory:selection.profileDirectory,copiedFiles,omissions,consistency:'BEST_EFFORT_NOT_ATOMIC',loginSession:'NOT_TESTED',complete:omissions.length===0};
   await fs.promises.writeFile(path.join(dest,'browse-open-copy.json'),JSON.stringify(data,null,2));
   try {profile(dest,selection.profileDirectory);}catch {throw new Failure('COPY_INCOMPLETE','Required Local State or Preferences could not be copied; inspect destination manifest',5,{destination:dest});}
-  return data;
+  return {...data,omissions:omissions.slice(0,12),omissionCount:omissions.length,omissionsTruncated:omissions.length>12,manifestPath:path.join(dest,'browse-open-copy.json')};
 }

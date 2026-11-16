@@ -9,7 +9,9 @@ const cli=path.join(skill,'scripts/browse-open.mjs');
 const run=Date.now(),dir=path.join(skill,'artifacts',`antigravity-native-dom-${run}`);
 const rounds=Number(process.argv[2]||10);
 if(!Number.isInteger(rounds)||rounds<1||rounds>10)throw Error('rounds must be 1..10');
-const root=path.resolve(process.env.BROWSE_NATIVE_TEST_ROOT||'secrets/chrome-native-copy-20261116-005737');
+if(!process.env.BROWSE_NATIVE_TEST_ROOT)throw Error('Set BROWSE_NATIVE_TEST_ROOT to the explicitly authorized -agis test root');
+const root=path.resolve(process.env.BROWSE_NATIVE_TEST_ROOT);
+if(!path.basename(root).endsWith('-agis'))throw Error('Cold test requires an authorized -agis root');
 const directory=process.env.BROWSE_NATIVE_TEST_PROFILE||'Profile 1';
 const endpoint=process.env.BROWSE_NATIVE_TEST_ENDPOINT||'http://127.0.0.1:4444';
 fs.mkdirSync(dir,{recursive:true});console.log('EVIDENCE_DIR='+dir);
@@ -19,9 +21,31 @@ function harness(command,extra={}) {
 }
 async function targets(){return await (await fetch(endpoint+'/json/list',{signal:AbortSignal.timeout(5000)})).json();}
 async function socket(){const v=await (await fetch(endpoint+'/json/version',{signal:AbortSignal.timeout(5000)})).json();return await Cdp.connect(v.webSocketDebuggerUrl,()=>10000);}
-const initial=harness('connect');
-if(initial.status!=='PASS'||initial.data.instance.kind!=='chrome')throw Error('Selected native Chrome unavailable');
-fs.writeFileSync(path.join(dir,'connection-before.json'),JSON.stringify(initial,null,2));
+function inventory(){return JSON.parse(execFileSync(process.execPath,[cli,'doctor'],{encoding:'utf8',timeout:15000,windowsHide:true})).data;}
+const sameRoot=p=>p.userDataDir&&path.resolve(p.userDataDir).toLowerCase()===root.toLowerCase();
+async function closeTestBrowser(){
+ const before=inventory(),selected=before.instances.filter(sameRoot);
+ if(selected.length>1)throw Error('Ambiguous test browser; no cleanup');
+ const unrelated=before.instances.filter(p=>!sameRoot(p)).map(p=>p.pid);
+ if(selected.length){
+  // Use harness identity checks BEFORE sending Browser.close; never close by port alone.
+  const checked=harness('connect',{instance:selected[0].pid});
+  if(checked.status!=='PASS'||checked.data.instance.kind!=='chrome')throw Error('Cleanup identity failed');
+  const cdp=await socket();
+  try{await cdp.call('Browser.close');}catch(e){if(!['CONNECTION_FAILED'].includes(e.code))throw e;}finally{cdp.disconnect();}
+ }
+ const deadline=Date.now()+15000;let after;
+ while(true){after=inventory();
+  let reachable=false;try{await fetch(endpoint+'/json/version',{signal:AbortSignal.timeout(600)});reachable=true;}catch{}
+  if(!after.instances.some(sameRoot)&&!reachable)break;
+  if(Date.now()>deadline)throw Error('Test browser or CDP still alive after cleanup');
+  await new Promise(r=>setTimeout(r,300));
+ }
+ const missing=unrelated.filter(pid=>!after.instances.some(p=>p.pid===pid));
+ if(missing.length)throw Error('Unrelated browser disappeared during cleanup: '+missing.join(','));
+ return {pass:true,closedPids:selected.map(p=>p.pid),remainingRootProcesses:0,cdpReachable:false,unrelatedPidsPreserved:unrelated};
+}
+fs.writeFileSync(path.join(dir,'cleanup-before.json'),JSON.stringify(await closeTestBrowser(),null,2));
 const results=[],events={},loads={};
 const server=http.createServer((req,res)=>{
  const u=new URL(req.url,'http://127.0.0.1');
@@ -68,8 +92,10 @@ async function agent(round,prompt){
 try {
  for(let round=1;round<=rounds;round++){
   const url=`http://127.0.0.1:${server.address().port}/round-${round}`,value=`NATIVE-DOM-${run}-${round}`;
-  const before=await targets();
-  const prompt=`Đọc skill [$browse-open](<${path.join(skill,'SKILL.md')}>) mở Chrome native riêng rồi check thao tác DOM trên đó xem thao tác được không.\nNgữ cảnh test đã được người dùng chọn/cho phép: dùng Chrome native Google đã cài, bản sao profile riêng ${root}, profile-directory ${directory}, endpoint ${endpoint}; reuse đúng browser này và MỞ MỘT TAB MỚI cho lượt ${round}. Không copy lại, không dùng profile gốc hay Chromium, không đóng tab/browser khác, không sửa source.\nTrang kiểm thử: ${url}. Dùng harness CLI/MCP của skill để open, fill #probe với giá trị ${value}, click #apply, rồi read #result đến khi đúng giá trị đó. Không dùng JS eval/desktop input hoặc tự viết Playwright thay harness. Giữ tab thử sau khi done để orchestrator kiểm chứng rồi đóng đúng tab đó trước lượt kế tiếp. Trả tối đa 5 dòng: PASS/FAIL, PID, targetId, URL, readback và giới hạn đăng nhập nếu có.`;
+  const before=[];
+  if(inventory().instances.some(sameRoot))throw Error('Cold precondition failed: test browser still running');
+  const prompt=`Use skill $browse-open at ${path.join(skill,'SKILL.md')} to launch a NEW native Chrome GUI and verify DOM. User-selected existing copy root: ${root}, directory ${directory}. Port 4444 is explicitly selected. The test browser is fully closed before this case: launch with open browser chrome, selected root/directory and port 4444; DO NOT pass endpoint or stale instance to the initial open. Do not copy again, use original personal root, Chromium, edit source or close any browser. After open use the returned endpoint/PID/target for DOM calls. Test URL ${url}; fill #probe with ${value}; click #apply; read #result until it matches. Use only skill CLI/MCP for browser actions, no custom JS/Playwright or desktop input. Leave browser alive after DONE: orchestrator independently verifies then closes ALL windows/processes belonging to the test -agis root before the next case. Reply in at most five lines with PASS/FAIL, PID, targetId, URL and readback. If root/port is already selected here, do not ask again.`;
+
   fs.writeFileSync(path.join(dir,`round-${round}.prompt.txt`),prompt);
   const a=await agent(round,prompt),record={round,url,value,...a,loads:loads[round]||0,events:events[round]||[],beforeIds:before.map(t=>t.id)};
   let owned=[];
@@ -88,16 +114,13 @@ try {
    record.pass=a.result?.status==='SUCCESS'&&a.readSkill&&['open','fill','click','read'].every(cmd=>a.tools.includes(cmd))&&record.verify.status==='PASS'&&record.read.data.snapshot.text===value&&record.independentDom.input===value&&record.independentDom.output===value&&record.independentDom.clickCount==='1'&&record.events.length===1&&record.events[0].value===value;
   }catch(e){record.verificationError=e.message;record.pass=false;}
   finally {
-   // Explicitly authorized cleanup: only freshly created targets for this round's exact URL.
-   const cdp=await socket();try{for(const target of owned)await cdp.call('Target.closeTarget',{targetId:target.id});}finally{cdp.disconnect();}
-   const after=await targets();record.cleanup={closedIds:owned.map(t=>t.id),remaining:after.filter(t=>t.url===url).map(t=>t.id),preexistingMissing:before.filter(b=>!after.some(t=>t.id===b.id)).map(t=>t.id)};
-   record.cleanup.pass=record.cleanup.remaining.length===0&&record.cleanup.preexistingMissing.length===0;
+   record.cleanup=await closeTestBrowser();
    record.pass=record.pass&&record.cleanup.pass;
   }
   results.push(record);save();console.log(JSON.stringify({round,pass:record.pass,readSkill:record.readSkill,tools:record.tools,dom:record.independentDom,events:record.events.length,cleanup:record.cleanup,agentError:record.error,verificationError:record.verificationError}));
   if(!record.cleanup.pass)throw Error('Cleanup/baseline verification failed; stopping before next case');
  }
- const summary={total:results.length,passed:results.filter(r=>r.pass).length,cleaned:results.filter(r=>r.cleanup.pass).length,distinctConversations:new Set(results.map(r=>r.conversation)).size,scope:'Ten fresh agent conversations and fresh tabs; reused same selected copied-profile native browser, not cold browser launches',dir};
+ const summary={total:results.length,passed:results.filter(r=>r.pass).length,cleaned:results.filter(r=>r.cleanup.pass).length,distinctConversations:new Set(results.map(r=>r.conversation)).size,scope:'Cold native launches: fresh agent conversation and new browser PID per case; full authorized -agis browser shutdown and CDP endpoint absence verified after each case',dir};
  fs.writeFileSync(path.join(dir,'summary.json'),JSON.stringify(summary,null,2));console.log('SUMMARY='+JSON.stringify(summary));
  if(summary.passed!==rounds)process.exitCode=1;
 }finally{server.closeAllConnections();await new Promise(r=>server.close(r));}

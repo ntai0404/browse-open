@@ -43,3 +43,9 @@ Run node --test tests/harness.test.mjs tests/mcp.test.mjs tests/chromium.test.mj
 Existing tests/live.test.mjs is opt-in using CHROMIUM_OPEN_ROOT/PROFILE/EXE. Historical Antigravity batch runners have project/model/profile assumptions and separate cleanup authorization. Do not run cold cleanup on a working user browser. See [evidence](verification.md) for observed scope; no general website acceptance is implied.
 
 Doctor also returns agisProfiles discovered beside known data roots (including workspace secrets). Follow the mandatory -agis selection and occupied-port question policy in SKILL.md before open/connect.
+
+copy-profile responses return up to 12 omission examples plus omissionCount, omissionsTruncated and manifestPath. Read the manifest only when a specific copy failure requires it; full details are preserved locally without filling the agent context.
+
+## Native cold-launch acceptance runner
+
+Set BROWSE_NATIVE_TEST_ROOT to the explicitly authorized -agis root, BROWSE_NATIVE_TEST_PROFILE to its directory key, and BROWSE_NATIVE_TEST_ENDPOINT to the selected loopback endpoint, then run node tests/antigravity-native-dom.mjs 10 on the host. Current acceptance uses port 4444. This runner requires authorization to close ALL windows of that exact test root, not merely a tab; it must not run against an active working profile. It verifies identity before Browser.close, waits for zero root processes/CDP unavailable, and preserves unrelated browser PIDs. Every round starts a fresh agent and browser, checks DOM independently, and shuts the test browser down before continuing. Ordinary skill open still keeps browser alive: this full shutdown is only the authorized acceptance workflow.
