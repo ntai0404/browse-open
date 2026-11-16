@@ -24,7 +24,7 @@ node <skill-dir>/scripts/browse-open.mjs open --browser chrome --executable "C:/
 
 copy-authorized yes records authorization already present in the conversation; the flag does not itself grant permission. The command copies selected-profile files and Local State without printing cookie/password contents. Manifest: destination/browse-open-copy.json. Read omissions, complete, consistency and loginSession. TIMEOUT may leave a partial root identified in effects.profileCopyRoot: inspect before retry, use a new destination and do not silently delete it.
 
-Open accepts optional port 1024..65535; omitted port chooses a free port. Occupied port: PORT_IN_USE, never stop its owner. Existing selected browser on a different requested port: PORT_MISMATCH, never restart. For connect/tabs/read/fill/click/verify, pass endpoint http://127.0.0.1:4444 rather than port.
+Open accepts optional port 1024..65535; omitted port uses 4444. Occupied port: PORT_IN_USE, never stop its owner. Existing selected browser on a different requested port: PORT_MISMATCH, never restart. For connect/tabs/read/fill/click/verify, pass endpoint http://127.0.0.1:4444 rather than port.
 
 MCP copy-profile fields: userDataDir, profileDirectory, destinationRoot, copyAuthorized (string yes). Open fields include browser (chrome) and port (string 4444). Restart the agent conversation after upgrading schemas.
 
@@ -41,3 +41,14 @@ Report separately: profile-copy completeness/consistency, GUI/CDP/DOM, login sta
 2026-11-16: installed Chrome 157.0.8103.78, selected Profile 1 copied into secrets/chrome-native-copy-20261116-005737. PID 1552, loopback port 4444. Initial copy: 8520 files, 18 locked-file errors including Cookies and session files. Profile path matched chrome://version. Two fresh connections passed local DOM fill/click/read. Authentication NOT_TESTED. These observations do not guarantee every machine/profile.
 
 Official references: https://developer.chrome.com/blog/remote-debugging-port and https://developer.chrome.com/docs/devtools/agents/get-started/configuration/
+
+
+## Required -agis selection policy (supersedes earlier location/port examples)
+
+First inspect doctor.agisProfiles and any additional known device browser-data parents. Match the literal suffix -agis on the separate data-root directory. Validate Local State plus selected profile Preferences, not just a folder name. Reuse one eligible root; ask the user to choose if multiple. Never silently use an older workspace copy without this suffix.
+
+If none exists, enumerate actual source profiles and require a user selection even for a single item. For selected display name A, destination is <parent-of-source-User-Data>/A-agis. Example: source C:/Users/USER/AppData/Local/Google/Chrome/User Data with directory Profile 1 and name Nguyen Xuan becomes C:/Users/USER/AppData/Local/Google/Chrome/Nguyen Xuan-agis, still containing Profile 1 and Local State. Keep valid Unicode names; replace Windows-invalid filename characters with underscores and show the final mapping. Resolve collisions by asking; do not overwrite. Do not put A-agis inside the default User Data: that would still be a default-root profile and CDP would fail. The sibling ROOT is the discoverable -agis identity, not a fabricated internal profile-directory key. This is the supported interpretation of keeping the copy beside user browser data.
+
+After selection, call copy-profile with that exact destination and copy-authorized yes; this requested workflow authorizes the selected copy. Do not edit copied Preferences/Local State merely to change its display name. Record omissions and preserve the source. On later requests rediscover this sibling root and reuse it, not copy again. No migration of existing copies is implied by a skill update.
+
+Default launch port 4444. Inspect OS listeners first. If occupied, ask the user to type a port and wait; never automatically fall back to a random port. This includes a matching browser unless the user explicitly requested its endpoint/port. Validate the chosen port, then verify existing ownership or launch only if free. Do not close an owner to free a port. The CLI enforces fixed 4444 as the default on new launch and returns PORT_IN_USE; the agent is responsible for the mandatory question before reuse.

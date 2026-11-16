@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {discoverAgis} from './agis.mjs';
 import {domAction} from './dom.mjs';
 import {copyProfile} from './profile-copy.mjs';
 import path from 'node:path';
@@ -190,7 +191,7 @@ export async function perform(command,opts,adapter,deadline) {
   if(opts.port!==undefined)requireThat(/^[0-9]+$/.test(opts.port)&&Number(opts.port)>=1024&&Number(opts.port)<=65535,'INVALID_PORT','port must be 1024..65535',2);
   if(command==='profiles')return {profiles:profiles(opts['user-data-dir'])};
   let inv=normalizeInventory(await adapter.inventory());
-  if(command==='doctor')return {os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
+  if(command==='doctor')return {agisProfiles:discoverAgis([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir),path.join(process.cwd(),'secrets','placeholder')]),os:inv.os,node:process.version,browsers:binaries(inv,opts.executable),instances:inv.processes,roots:[...new Set([process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Chromium/User Data'),process.env.LOCALAPPDATA&&path.join(process.env.LOCALAPPDATA,'Google/Chrome Beta/User Data'),opts['user-data-dir'],...inv.processes.map(p=>p.userDataDir)].filter(p=>p&&fs.existsSync(p)))],capabilities:{tcpCdp:true,pipeTakeover:false,createProfile:false,closeBrowser:false,platform:'win32'}};
   const selection=profile(opts['user-data-dir'],opts['profile-directory']);
   if(opts.browser)requireThat(['chromium','chrome'].includes(opts.browser),'INVALID_BROWSER','Use chromium or chrome; Beta is unsupported',2);
   if(opts.executable)requireThat(fs.existsSync(opts.executable),'BROWSER_NOT_FOUND','Selected executable does not exist');
@@ -205,10 +206,10 @@ export async function perform(command,opts,adapter,deadline) {
     requireThat(!inv.processes.some(p=>!p.inspectable || (!p.userDataDir && same(p.executable,exe))),'PROFILE_OCCUPANCY_UNKNOWN','A running browser has unknown profile ownership; cannot safely launch');
     const protectedRoots=process.env.LOCALAPPDATA?['Google/Chrome/User Data','Google/Chrome Beta/User Data','Chromium/User Data'].map(p=>path.join(process.env.LOCALAPPDATA,p)):[];
     requireThat(!protectedRoots.some(root=>same(selection.userDataDir,root)),'DEFAULT_PROFILE_CDP_UNSUPPORTED','Use an explicitly selected existing automation root; do not enable CDP on a default personal root');
-    const port=opts.port?Number(opts.port):await freePort();
-    if(opts.port) {
+    const port=opts.port?Number(opts.port):4444;
+    {
       try {await new Promise((resolve,reject)=>{const server=net.createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolve));});}
-      catch {throw new Failure('PORT_IN_USE','Requested loopback port is unavailable; do not stop its owner');}
+      catch {throw new Failure('PORT_IN_USE','Requested loopback port is unavailable; ask the user to enter another port; never auto-select or stop its owner');}
     }
     const started=await adapter.launch({executable:exe,root:selection.userDataDir,profile:selection.profileDirectory,port});
     opts={...opts,executable:exe,instance:String(started.pid)};launched=true;

@@ -11,7 +11,7 @@
         "Node >=22 with native WebSocket",
         "Windows host process inspection permission"
       ],
-      "expectedResult": "OS, binaries, instances, roots and supported transport inventory; no browser mutation",
+      "expectedResult": "OS, binaries, instances, roots and supported transport inventory; no browser mutation; agisProfiles lists valid sibling -agis roots",
       "failures": [
         "HOST_INSPECTION_FAILED",
         "TIMEOUT"
@@ -92,7 +92,9 @@
         "Explicit existing root and exact directory key",
         "Optional HTTP(S) URL without credentials or exact about:blank; omitted URL defaults to about:blank",
         "Matching inspectable TCP instance OR selected known executable and unused root",
-        "No implicit profile creation or default-root Chrome CDP launch"
+        "No implicit profile creation or default-root Chrome CDP launch",
+        "Agent selected an existing -agis profile, or user selected the source for its first copy",
+        "Default launch port 4444; occupied default port requires explicit user port choice before reuse or retry"
       ],
       "expectedResult": "One new requested page (default about:blank) in reused or newly launched GUI browser; browser stays alive after CLI exit",
       "failures": [

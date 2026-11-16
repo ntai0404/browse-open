@@ -11,8 +11,11 @@ Two variants: **Chromium** (`browser: chromium`) and installed **native Google C
 
 1. Inspect available tools, then call MCP `browse_open/doctor` or `node <skill-dir>/scripts/browse-open.mjs doctor` on the host. Prefer the MCP host when Antigravity terminal inspection is isolated; do not repeat a failing isolated shell.
 2. Select the executable discovered by doctor for the requested variant. Read [Chromium](references/chromium.md) for Chromium; read [native Chrome](references/chrome-native.md) before selecting a Chrome root, copying data or choosing a port.
-3. Call profiles on an existing root. Identity is executable + user-data-dir + profileDirectory; display name is not a directory. Preserve the user's prior selection. If several profiles remain eligible and none was selected, list numbered identities and ask once. One eligible profile can be used with its identity stated. No eligible profile: BLOCKED; do not initialize one.
-4. Use the task URL, otherwise about:blank. Do not ask for a URL merely because it was omitted. Keep the requested port when specified.
+3. **Always discover existing `-agis` profiles before opening.** Read doctor.data.agisProfiles (valid roots ending in -agis beside discovered data roots), and inspect other known browser data parents if necessary. Preserve the selected -agis identity. Exactly one valid -agis profile: reuse it. Multiple: list numbered full root/directory/display names and ask which one; never silently choose.
+4. **No valid -agis profile:** list actual device profiles (profiles on discovered roots), with numbered display name + directory + root, and require the user to choose, even if only one exists. Never default to Default, Profile 1, the first item or a historical non-agis copy. Once the user selects A, copy that selection to a new sibling data root named A-agis using copy-profile. This workflow authorizes making that copy after selection; do not ask for duplicate copy approval. Keep the original profile directory key inside the root. See the native reference for exact path rules. Never overwrite, rename or delete an existing profile. Record the source and destination; next task must rediscover and reuse -agis.
+5. Default requested launch port is **4444**, not a random port. Before opening/connecting, inspect listeners. If 4444 is occupied, **ask the user to enter the port to use and wait**, including when its owner appears reusable; do not silently reuse that occupied port or pick another. After their explicit port choice, verify its owner if reusing, or verify it is free before launch. If the chosen port is also unavailable, report the owner and ask again; never stop it. An explicit instruction to use an existing endpoint is the user's port selection, so do not ask again about that same endpoint.
+6. Use the task URL, otherwise about:blank; do not ask for an omitted URL.
+
 
 ## Execution contract
 
@@ -27,7 +30,7 @@ CLI and MCP expose ten operations: doctor, profiles, connect, tabs, open, verify
 
 Do not restart/close the user's browser, delete locks/profiles, change selection, bypass permission dialogs, or enable autoConnect. Default personal data roots cannot be launched through port CDP.
 
-A native Chrome **copy** to a separate root is supported only after the user explicitly requests/allows copying that selected profile. Use copy-profile with a fresh destination in an ignored secrets directory. Once authorized and selected, proceed without asking again. The source is untouched; do not decrypt cookies or bypass file locks.
+The -agis setup copies only the profile explicitly selected by the user, under the workflow above. Use copy-profile with a fresh sibling data root ending in -agis beside the source User Data root; keep data outside publication. Once authorized and selected, proceed without asking again. The source is untouched; do not decrypt cookies or bypass file locks.
 
 Copy PASS means required metadata exists in the destination, not that all files or login sessions survived. Read omissions, complete, consistency and loginSession. A live source may have locked cookie/session files. A copied profile is independent and does not sync back to the original. Report copy, GUI/CDP/DOM and authentication results separately.
 

@@ -16,7 +16,7 @@ Windows, Node >=22, PowerShell and authorized host process/GUI/loopback access. 
 
 All commands: default timeout 20000ms, range 500..120000. Exactly one stdout JSON, schemaVersion 1, status, data/error, effects. Exit 0 PASS, 2 invalid arguments, 3 BLOCKED precondition, 4 connection/timeout, 5 verification/internal error. Inspect effects even on failure before retrying a mutating command; a click timeout does not prove no click occurred.
 
-Browser values: chromium or chrome; Beta unsupported. Open --port 4444 selects a free loopback port; other commands use --endpoint http://127.0.0.1:4444. Port range 1024..65535. Occupied/mismatched ports are blocked without terminating processes. Omitted port selects a free port automatically.
+Browser values: chromium or chrome; Beta unsupported. Open --port 4444 selects a free loopback port; other commands use --endpoint http://127.0.0.1:4444. Port range 1024..65535. Occupied/mismatched ports are blocked without terminating processes. Omitted launch port is 4444. PORT_IN_USE requires asking the user to enter another port, never automatic fallback.
 
 copy-profile JSON: copiedFiles, omissions, complete, consistency, loginSession. Manifest in destination/browse-open-copy.json. Partial copy/timeout identifies destination in effects.profileCopyRoot. Required metadata can exist even when cookies/session files were omitted; copy PASS does not prove login.
 
@@ -41,3 +41,5 @@ Native without enable-automation: a specific Browser.getBrowserCommandLine rejec
 Run node --test tests/harness.test.mjs tests/mcp.test.mjs tests/chromium.test.mjs tests/profile-copy.test.mjs tests/native.test.mjs on an authorized Windows host. Mocked boundaries are unit evidence, not live browser proof.
 
 Existing tests/live.test.mjs is opt-in using CHROMIUM_OPEN_ROOT/PROFILE/EXE. Historical Antigravity batch runners have project/model/profile assumptions and separate cleanup authorization. Do not run cold cleanup on a working user browser. See [evidence](verification.md) for observed scope; no general website acceptance is implied.
+
+Doctor also returns agisProfiles discovered beside known data roots (including workspace secrets). Follow the mandatory -agis selection and occupied-port question policy in SKILL.md before open/connect.
